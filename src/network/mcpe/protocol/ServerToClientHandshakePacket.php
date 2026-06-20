@@ -21,6 +21,8 @@ class ServerToClientHandshakePacket extends DataPacket implements ClientboundPac
 
 	/** Server pubkey and token is contained in the JWT. */
 	public string $jwt;
+	public string $publicKey = "";
+	public string $serverToken = "";
 
 	/**
 	 * @generate-create-func
@@ -36,10 +38,21 @@ class ServerToClientHandshakePacket extends DataPacket implements ClientboundPac
 	}
 
 	protected function decodePayload(PacketSerializer $in) : void{
+		if($in->getProtocolId() <= ProtocolInfo::PROTOCOL_1_1_5){
+			$this->publicKey = $in->getString();
+			$this->serverToken = $in->getString();
+			$this->jwt = "";
+			return;
+		}
 		$this->jwt = $in->getString();
 	}
 
 	protected function encodePayload(PacketSerializer $out) : void{
+		if($out->getProtocolId() <= ProtocolInfo::PROTOCOL_1_1_5){
+			$out->putString($this->publicKey);
+			$out->putString($this->serverToken);
+			return;
+		}
 		$out->putString($this->jwt);
 	}
 

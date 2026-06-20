@@ -113,6 +113,10 @@ trait PacketHandlerDefaultImplTrait{
 		return false;
 	}
 
+	public function handleRemoveBlock(RemoveBlockPacket $packet) : bool{
+		return false;
+	}
+
 	public function handleUpdateBlock(UpdateBlockPacket $packet) : bool{
 		return false;
 	}
@@ -173,7 +177,23 @@ trait PacketHandlerDefaultImplTrait{
 		return false;
 	}
 
+	public function handleUseItem(UseItemPacket $packet) : bool{
+		return false;
+	}
+
 	public function handlePlayerAction(PlayerActionPacket $packet) : bool{
+		return false;
+	}
+
+	public function handleActorFall(ActorFallPacket $packet) : bool{
+		return false;
+	}
+
+	public function handleDropItem(DropItemPacket $packet) : bool{
+		return false;
+	}
+
+	public function handleInventoryAction(InventoryActionPacket $packet) : bool{
 		return false;
 	}
 
@@ -334,6 +354,10 @@ trait PacketHandlerDefaultImplTrait{
 	}
 
 	public function handleCommandRequest(CommandRequestPacket $packet) : bool{
+		return false;
+	}
+
+	public function handleCommandStep(CommandStepPacket $packet) : bool{
 		return false;
 	}
 

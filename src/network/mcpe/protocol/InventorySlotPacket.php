@@ -44,6 +44,15 @@ class InventorySlotPacket extends DataPacket implements ClientboundPacket{
 	}
 
 	protected function decodePayload(PacketSerializer $in) : void{
+		if($in->getProtocolId() <= ProtocolInfo::PROTOCOL_1_1_5){
+			$this->windowId = $in->getByte();
+			$this->inventorySlot = $in->getVarInt();
+			$in->getVarInt(); //hotbar slot
+			$this->item = ItemStackWrapper::legacy($in->getItemStackWithoutStackId());
+			$in->getByte(); //selected slot flag
+			return;
+		}
+
 		$this->windowId = $in->getUnsignedVarInt();
 		$this->inventorySlot = $in->getUnsignedVarInt();
 		if($in->getProtocolId() >= ProtocolInfo::PROTOCOL_1_26_20){
@@ -67,6 +76,15 @@ class InventorySlotPacket extends DataPacket implements ClientboundPacket{
 	}
 
 	protected function encodePayload(PacketSerializer $out) : void{
+		if($out->getProtocolId() <= ProtocolInfo::PROTOCOL_1_1_5){
+			$out->putByte($this->windowId);
+			$out->putVarInt($this->inventorySlot);
+			$out->putVarInt($this->inventorySlot);
+			$out->putItemStackWithoutStackId($this->item->getItemStack());
+			$out->putByte(0);
+			return;
+		}
+
 		$out->putUnsignedVarInt($this->windowId);
 		$out->putUnsignedVarInt($this->inventorySlot);
 		if($out->getProtocolId() >= ProtocolInfo::PROTOCOL_1_26_20){

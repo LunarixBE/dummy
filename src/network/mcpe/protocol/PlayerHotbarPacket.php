@@ -16,12 +16,15 @@ namespace pocketmine\network\mcpe\protocol;
 
 use pocketmine\network\mcpe\protocol\serializer\PacketSerializer;
 use pocketmine\network\mcpe\protocol\types\inventory\ContainerIds;
+use function count;
 
 class PlayerHotbarPacket extends DataPacket implements ClientboundPacket, ServerboundPacket{
 	public const NETWORK_ID = ProtocolInfo::PLAYER_HOTBAR_PACKET;
 
 	public int $selectedHotbarSlot;
 	public int $windowId = ContainerIds::INVENTORY;
+	/** @var int[] */
+	public array $slots = [];
 	public bool $selectHotbarSlot = true;
 
 	/**
@@ -38,12 +41,25 @@ class PlayerHotbarPacket extends DataPacket implements ClientboundPacket, Server
 	protected function decodePayload(PacketSerializer $in) : void{
 		$this->selectedHotbarSlot = $in->getUnsignedVarInt();
 		$this->windowId = $in->getByte();
+		if($in->getProtocolId() <= ProtocolInfo::PROTOCOL_1_1_5){
+			for($slot = 0, $slots = $in->getUnsignedVarInt(); $slot < $slots; ++$slot){
+				$this->slots[$slot] = $in->getUnsignedVarInt();
+			}
+			return;
+		}
 		$this->selectHotbarSlot = $in->getBool();
 	}
 
 	protected function encodePayload(PacketSerializer $out) : void{
 		$out->putUnsignedVarInt($this->selectedHotbarSlot);
 		$out->putByte($this->windowId);
+		if($out->getProtocolId() <= ProtocolInfo::PROTOCOL_1_1_5){
+			$out->putUnsignedVarInt(count($this->slots));
+			foreach($this->slots as $slot){
+				$out->putUnsignedVarInt($slot);
+			}
+			return;
+		}
 		$out->putBool($this->selectHotbarSlot);
 	}
 

@@ -100,7 +100,11 @@ class TypeConverter{
 
 		$this->itemTypeDictionary = ItemTypeDictionaryFromDataHelper::loadFromProtocolId($protocolId);
 		$this->itemDataDowngrader = new ItemIdMetaDowngrader($this->itemTypeDictionary, ItemTranslator::getItemSchemaId($protocolId));
-		$this->shieldRuntimeId = $this->itemTypeDictionary->fromStringId(ItemTypeNames::SHIELD);
+		try{
+			$this->shieldRuntimeId = $this->itemTypeDictionary->fromStringId(ItemTypeNames::SHIELD);
+		}catch(\InvalidArgumentException){
+			$this->shieldRuntimeId = PHP_INT_MIN;
+		}
 
 		$this->itemTranslator = new ItemTranslator(
 			$this->itemTypeDictionary,

@@ -35,14 +35,18 @@ class GuiDataPickItemPacket extends DataPacket implements ClientboundPacket{
 	}
 
 	protected function decodePayload(PacketSerializer $in) : void{
-		$this->itemDescription = $in->getString();
-		$this->itemEffects = $in->getString();
+		if($in->getProtocolId() >= ProtocolInfo::PROTOCOL_1_16_0){
+			$this->itemDescription = $in->getString();
+			$this->itemEffects = $in->getString();
+		}
 		$this->hotbarSlot = $in->getLInt();
 	}
 
 	protected function encodePayload(PacketSerializer $out) : void{
-		$out->putString($this->itemDescription);
-		$out->putString($this->itemEffects);
+		if($out->getProtocolId() >= ProtocolInfo::PROTOCOL_1_16_0){
+			$out->putString($this->itemDescription);
+			$out->putString($this->itemEffects);
+		}
 		$out->putLInt($this->hotbarSlot);
 	}
 

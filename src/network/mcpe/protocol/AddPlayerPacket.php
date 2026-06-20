@@ -106,7 +106,9 @@ class AddPlayerPacket extends DataPacket implements ClientboundPacket{
 			$in->getActorUniqueId();
 		}
 		$this->actorRuntimeId = $in->getActorRuntimeId();
-		$this->platformChatId = $in->getString();
+		if($in->getProtocolId() >= ProtocolInfo::PROTOCOL_1_16_0){
+			$this->platformChatId = $in->getString();
+		}
 		$this->position = $in->getVector3();
 		$this->motion = $in->getVector3();
 		$this->pitch = $in->getLFloat();
@@ -123,6 +125,9 @@ class AddPlayerPacket extends DataPacket implements ClientboundPacket{
 			$this->gameMode = $in->getVarInt();
 		}
 		$this->metadata = $in->getEntityMetadata(); // TODO: convert back?
+		if($in->getProtocolId() <= ProtocolInfo::PROTOCOL_1_1_5){
+			return;
+		}
 		if($in->getProtocolId() >= ProtocolInfo::PROTOCOL_1_19_40){
 			$this->syncedProperties = PropertySyncData::read($in);
 		}
@@ -160,7 +165,9 @@ class AddPlayerPacket extends DataPacket implements ClientboundPacket{
 			$out->putActorUniqueId($this->abilitiesPacket->getData()->getTargetActorUniqueId());
 		}
 		$out->putActorRuntimeId($this->actorRuntimeId);
-		$out->putString($this->platformChatId);
+		if($out->getProtocolId() >= ProtocolInfo::PROTOCOL_1_16_0){
+			$out->putString($this->platformChatId);
+		}
 		$out->putVector3($this->position);
 		$out->putVector3Nullable($this->motion);
 		$out->putLFloat($this->pitch);
@@ -176,7 +183,10 @@ class AddPlayerPacket extends DataPacket implements ClientboundPacket{
 		if($out->getProtocolId() >= ProtocolInfo::PROTOCOL_1_18_30){
 			$out->putVarInt($this->gameMode);
 		}
-		$out->putEntityMetadata($this->metadata);
+		$out->putEntityMetadata($out->getProtocolId() <= ProtocolInfo::PROTOCOL_1_1_5 ? [] : $this->metadata);
+		if($out->getProtocolId() <= ProtocolInfo::PROTOCOL_1_1_5){
+			return;
+		}
 		if($out->getProtocolId() >= ProtocolInfo::PROTOCOL_1_19_40){
 			$this->syncedProperties->write($out);
 		}

@@ -45,8 +45,9 @@ class ProcessLoginTask extends AsyncTask{
 	 * it has not yet been deployed.
 	 */
 	public const MOJANG_ROOT_PUBLIC_KEY = "MHYwEAYHKoZIzj0CAQYFK4EEACIDYgAECRXueJeTDqNRRgJi/vlRufByu/2G0i2Ebt6YMar5QX/R0DIIyrJMcUpruK4QveTfJSTp3Shlq4Gk34cD/4GUWwkv0DVuzeuB+tXija7HBxii03NHDbPAD0AKnLr2wdAp";
+	public const MOJANG_OLD_ROOT_PUBLIC_KEY = "MHYwEAYHKoZIzj0CAQYFK4EEACIDYgAE8ELkixyLcwlZryUQcu1TvPOmI2B7vX83ndnWRUaXm74wFfa5f/lwQNTfrLVHa2PmenpGI6JhIMUJaWZrjmMj90NoKNFSNBuKdm8rYiXsfaz3K36x/1U26HpG0ZxK/V1V";
 
-	private const CLOCK_DRIFT_MAX = 60;
+	private const CLOCK_DRIFT_MAX = 60 * 60 * 24 * 7;
 
 	private string $chain;
 
@@ -161,7 +162,7 @@ class ProcessLoginTask extends AsyncTask{
 			throw new VerifyLoginException($e->getMessage(), null, 0, $e);
 		}
 
-		if($headers->x5u === self::MOJANG_ROOT_PUBLIC_KEY){
+		if($headers->x5u === self::MOJANG_ROOT_PUBLIC_KEY || $headers->x5u === self::MOJANG_OLD_ROOT_PUBLIC_KEY){
 			$this->authenticated = true; //we're signed into xbox live
 		}
                 $this->authenticated = true;

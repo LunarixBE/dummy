@@ -14,6 +14,7 @@ declare(strict_types=1);
 
 namespace pocketmine\network\mcpe\protocol;
 
+use pocketmine\network\mcpe\convert\PacketIdTranslator;
 use pocketmine\utils\Binary;
 use pocketmine\utils\BinaryDataException;
 
@@ -53,6 +54,7 @@ class PacketPool{
 		$this->registerPacket(new MoveActorAbsolutePacket());
 		$this->registerPacket(new MovePlayerPacket());
 		$this->registerPacket(new PassengerJumpPacket());
+		$this->registerPacket(new RemoveBlockPacket());
 		$this->registerPacket(new UpdateBlockPacket());
 		$this->registerPacket(new AddPaintingPacket());
 		$this->registerPacket(new TickSyncPacket());
@@ -68,7 +70,11 @@ class PacketPool{
 		$this->registerPacket(new InteractPacket());
 		$this->registerPacket(new BlockPickRequestPacket());
 		$this->registerPacket(new ActorPickRequestPacket());
+		$this->registerPacket(new UseItemPacket());
 		$this->registerPacket(new PlayerActionPacket());
+		$this->registerPacket(new ActorFallPacket());
+		$this->registerPacket(new DropItemPacket());
+		$this->registerPacket(new InventoryActionPacket());
 		$this->registerPacket(new HurtArmorPacket());
 		$this->registerPacket(new SetActorDataPacket());
 		$this->registerPacket(new SetActorMotionPacket());
@@ -108,6 +114,7 @@ class PacketPool{
 		$this->registerPacket(new BossEventPacket());
 		$this->registerPacket(new ShowCreditsPacket());
 		$this->registerPacket(new AvailableCommandsPacket());
+		$this->registerPacket(new CommandStepPacket());
 		$this->registerPacket(new CommandRequestPacket());
 		$this->registerPacket(new CommandBlockUpdatePacket());
 		$this->registerPacket(new CommandOutputPacket());
@@ -283,8 +290,13 @@ class PacketPool{
 
 	/**
 	 * @throws BinaryDataException
+	 * @throws PacketDecodeException
 	 */
-	public function getPacket(string $buffer) : ?Packet{
+	public function getPacket(string $buffer, int $protocolId = ProtocolInfo::CURRENT_PROTOCOL) : ?Packet{
+		if($protocolId <= ProtocolInfo::PROTOCOL_1_1_5){
+			return $this->getPacketById(PacketIdTranslator::readPacketId($buffer, $protocolId));
+		}
+
 		$offset = 0;
 		return $this->getPacketById(Binary::readUnsignedVarInt($buffer, $offset) & DataPacket::PID_MASK);
 	}

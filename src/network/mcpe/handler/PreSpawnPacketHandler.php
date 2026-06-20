@@ -63,6 +63,7 @@ class PreSpawnPacketHandler extends PacketHandler{
 		Timings::$playerNetworkSendPreSpawnGameData->startTiming();
 		try{
 			$protocolId = $this->session->getProtocolId();
+			$isLegacy1_1 = $protocolId <= ProtocolInfo::PROTOCOL_1_1_5;
 			$location = $this->player->getLocation();
 			$world = $location->getWorld();
 
@@ -121,42 +122,48 @@ class PreSpawnPacketHandler extends PacketHandler{
 				$this->session->sendDataPacket(ItemRegistryPacket::create($typeConverter->getItemTypeDictionary()->getEntries()));
 			}
 
-			$this->session->getLogger()->debug("Sending actor identifiers");
-			$this->session->sendDataPacket(StaticPacketCache::getInstance()->getAvailableActorIdentifiers());
+			if(!$isLegacy1_1){
+				$this->session->getLogger()->debug("Sending actor identifiers");
+				$this->session->sendDataPacket(StaticPacketCache::getInstance()->getAvailableActorIdentifiers());
 
-			$this->session->getLogger()->debug("Sending biome definitions");
-			$this->session->sendDataPacket(StaticPacketCache::getInstance()->getBiomeDefs($this->session->getProtocolId()));
+				$this->session->getLogger()->debug("Sending biome definitions");
+				$this->session->sendDataPacket(StaticPacketCache::getInstance()->getBiomeDefs($this->session->getProtocolId()));
+			}
 
 			$this->session->getLogger()->debug("Sending attributes");
 			$this->session->getEntityEventBroadcaster()->syncAttributes([$this->session], $this->player, $this->player->getAttributeMap()->getAll());
 
-			$this->session->getLogger()->debug("Sending available commands");
-			$this->session->syncAvailableCommands();
+			if(!$isLegacy1_1){
+				$this->session->getLogger()->debug("Sending available commands");
+				$this->session->syncAvailableCommands();
+			}
 
 			$this->session->getLogger()->debug("Sending abilities");
 			$this->session->syncAbilities($this->player);
 			$this->session->syncAdventureSettings();
 
-			$this->session->getLogger()->debug("Sending effects");
-			foreach($this->player->getEffects()->all() as $effect){
-				$this->session->getEntityEventBroadcaster()->onEntityEffectAdded([$this->session], $this->player, $effect, false);
+			if(!$isLegacy1_1){
+				$this->session->getLogger()->debug("Sending effects");
+				foreach($this->player->getEffects()->all() as $effect){
+					$this->session->getEntityEventBroadcaster()->onEntityEffectAdded([$this->session], $this->player, $effect, false);
+				}
+
+				$this->session->getLogger()->debug("Sending actor metadata");
+				$this->player->sendData([$this->player]);
+
+				$this->session->getLogger()->debug("Sending inventory");
+				$this->inventoryManager->syncAll();
+				$this->inventoryManager->syncSelectedHotbarSlot();
+
+				$this->session->getLogger()->debug("Sending creative inventory data");
+				$this->inventoryManager->syncCreative();
+
+				$this->session->getLogger()->debug("Sending crafting data");
+				$this->session->sendDataPacket(CraftingDataCache::getInstance($protocolId)->getCache($this->server->getCraftingManager()));
+
+				$this->session->getLogger()->debug("Sending player list");
+				$this->session->syncPlayerList($this->server->getOnlinePlayers());
 			}
-
-			$this->session->getLogger()->debug("Sending actor metadata");
-			$this->player->sendData([$this->player]);
-
-			$this->session->getLogger()->debug("Sending inventory");
-			$this->inventoryManager->syncAll();
-			$this->inventoryManager->syncSelectedHotbarSlot();
-
-			$this->session->getLogger()->debug("Sending creative inventory data");
-			$this->inventoryManager->syncCreative();
-
-			$this->session->getLogger()->debug("Sending crafting data");
-			$this->session->sendDataPacket(CraftingDataCache::getInstance($protocolId)->getCache($this->server->getCraftingManager()));
-
-			$this->session->getLogger()->debug("Sending player list");
-			$this->session->syncPlayerList($this->server->getOnlinePlayers());
 		}finally{
 			Timings::$playerNetworkSendPreSpawnGameData->stopTiming();
 		}

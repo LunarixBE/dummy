@@ -130,6 +130,7 @@ use function is_string;
 use function json_encode;
 use function ord;
 use function random_bytes;
+use function sprintf;
 use function str_split;
 use function strcasecmp;
 use function strlen;
@@ -239,6 +240,10 @@ class NetworkSession{
     private function onSessionStartSuccess() : void{
         $this->logger->debug("Session start handshake completed, awaiting login packet");
         $this->flushGamePacketQueue();
+        $this->beginLogin();
+    }
+
+    private function beginLogin() : void{
         $this->enableCompression = true;
         $this->setHandler(new LoginPacketHandler(
             $this->server,
@@ -251,6 +256,30 @@ class NetworkSession{
             },
             $this->setAuthenticationStatus(...)
         ));
+    }
+
+    /**
+     * @throws PacketHandlingException
+     */
+    private function tryHandleRawLegacyLogin(string $payload) : bool{
+        if($this->protocolId !== null || $payload === "" || ord($payload[0]) !== 0x01){
+            return false;
+        }
+
+        try{
+            $packet = $this->packetPool->getPacket($payload, ProtocolInfo::PROTOCOL_1_1_5);
+        }catch(PacketDecodeException|BinaryDataException){
+            return false;
+        }
+        if($packet === null || $packet->pid() !== ProtocolInfo::LOGIN_PACKET){
+            return false;
+        }
+
+        $this->logger->debug("Detected raw legacy 1.1.5 LoginPacket without batch framing");
+        $this->setProtocolId(ProtocolInfo::PROTOCOL_1_1_5);
+        $this->beginLogin();
+        $this->handleDataPacket($packet, $payload);
+        return true;
     }
 
     protected function createPlayer() : void{
@@ -432,17 +461,39 @@ class NetworkSession{
                     }
                 }
             }else{
-                $decompressed = $payload;
+                if($this->protocolId === null && $payload[0] === "\x78"){
+                    try{
+                        Timings::$playerNetworkReceiveDecompress->startTiming();
+                        $decompressed = $this->compressor->decompress($payload);
+                        $this->logger->debug("Detected compressed legacy packet before NetworkSettings");
+                    }catch(DecompressionException){
+                        $decompressed = $payload;
+                    }finally{
+                        Timings::$playerNetworkReceiveDecompress->stopTiming();
+                    }
+                }else{
+                    $decompressed = $payload;
+                }
             }
 
             try{
+                if($this->tryHandleRawLegacyLogin($decompressed)){
+                    return;
+                }
+
                 $stream = new BinaryStream($decompressed);
                 foreach(PacketBatch::decodeRaw($stream) as $buffer){
                     $this->gamePacketLimiter->decrement();
-                    $packet = $this->packetPool->getPacket($buffer);
+                    $packet = $this->packetPool->getPacket($buffer, $this->getProtocolId());
                     if($packet === null){
+                        if($this->tryHandleRawLegacyLogin($decompressed)){
+                            return;
+                        }
                         $this->logger->debug("Unknown packet: " . base64_encode($buffer));
-                        throw new PacketHandlingException("Unknown packet received");
+                        throw new PacketHandlingException("Unknown packet received (first byte " . ($buffer !== "" ? sprintf("0x%02x", ord($buffer[0])) : "empty") . ", length " . strlen($buffer) . ")");
+                    }
+                    if($this->protocolId === null && $packet->pid() === ProtocolInfo::LOGIN_PACKET){
+                        $this->beginLogin();
                     }
                     try{
                         $this->handleDataPacket($packet, $buffer);
@@ -453,18 +504,7 @@ class NetworkSession{
                 }
             }catch(PacketDecodeException|BinaryDataException $e){
                 if (!$this->enableCompression) {
-                    $this->enableCompression = true;
-                    $this->setHandler(new LoginPacketHandler(
-                        $this->server,
-                        $this,
-                        function(PlayerInfo $info) : void{
-                            $this->info = $info;
-                            //$this->logger->info($this->server->getLanguage()->translate(KnownTranslationFactory::pocketmine_network_session_playerName(TextFormat::AQUA . $info->getUsername() . TextFormat::RESET)));
-                            $this->logger->setPrefix($this->getLogPrefix());
-                            $this->manager->markLoginReceived($this);
-                        },
-                        $this->setAuthenticationStatus(...)
-                    ));
+                    $this->beginLogin();
                     $this->handleEncoded($payload);
                     return;
                 }
@@ -873,17 +913,17 @@ class NetworkSession{
         }, $reason);
     }
 
-    private function setAuthenticationStatus(bool $authenticated, bool $authRequired, Translatable|string|null $error, ?string $clientPubKey) : void{
-        if(!$this->connected){
-            return;
-        }
-        if($error === null){
-            if($authenticated && !($this->info instanceof XboxLivePlayerInfo)){
-                $error = "Expected XUID but none found";
-            }elseif($clientPubKey === null){
-                $error = "Missing client public key"; //failsafe
-            }
-        }
+	private function setAuthenticationStatus(bool $authenticated, bool $authRequired, Translatable|string|null $error, ?string $clientPubKey) : void{
+		if(!$this->connected){
+			return;
+		}
+		if($error === null){
+			if($authenticated && !($this->info instanceof XboxLivePlayerInfo) && $this->protocolId > ProtocolInfo::PROTOCOL_1_1_5){
+				$error = "Expected XUID but none found";
+			}elseif($clientPubKey === null){
+				$error = "Missing client public key"; //failsafe
+			}
+		}
 
         if($error !== null){
             $this->disconnectWithError(
@@ -1009,6 +1049,10 @@ class NetworkSession{
     public function notifyTerrainReady() : void{
         $this->logger->debug("Sending spawn notification, waiting for spawn response");
         $this->sendDataPacket(PlayStatusPacket::create(PlayStatusPacket::PLAYER_SPAWN));
+        if($this->getProtocolId() <= ProtocolInfo::PROTOCOL_1_1_5){
+            $this->onClientSpawnResponse();
+            return;
+        }
         $this->setHandler(new SpawnResponsePacketHandler($this->onClientSpawnResponse(...)));
     }
 

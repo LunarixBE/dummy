@@ -33,6 +33,7 @@ final class ProtocolInfo{
 
 	/** Actual Minecraft: PE protocol version */
 
+	public const PROTOCOL_1_1_5 = 113;
 	public const PROTOCOL_1_26_20 = 975;
 	public const PROTOCOL_1_26_10 = 944;
 	public const PROTOCOL_1_26_0 = 924;
@@ -88,6 +89,7 @@ final class ProtocolInfo{
 
 	public const CURRENT_PROTOCOL = self::PROTOCOL_1_26_20;
 	public const ACCEPTED_PROTOCOL = [
+		self::PROTOCOL_1_1_5,
 		self::PROTOCOL_1_16_20,
 		self::PROTOCOL_1_16_100,
 		self::PROTOCOL_1_16_200,
@@ -273,6 +275,22 @@ final class ProtocolInfo{
 
 	public const ADD_ENTITY_PACKET = 0x7f;
 	public const REMOVE_ENTITY_PACKET = 0x80;
+
+	/*
+	 * Synthetic IDs for packets removed before the modern BedrockProtocol
+	 * numbering. They let the legacy packet ID translator avoid decoding a
+	 * 1.1.5 packet as an unrelated modern packet with the same network ID.
+	 */
+	public const EXPLODE_PACKET = 0x100;
+	public const CONTAINER_SET_SLOT_PACKET = 0x101;
+	public const CONTAINER_SET_CONTENT_PACKET = 0x102;
+	public const DROP_ITEM_PACKET = 0x103;
+	public const USE_ITEM_PACKET = 0x104;
+	public const REMOVE_BLOCK_PACKET = 0x105;
+	public const COMMAND_STEP_PACKET = 0x106;
+	public const ADD_HANGING_ACTOR_PACKET = 0x107;
+	public const INVENTORY_ACTION_PACKET = 0x108;
+	public const ADD_ITEM_PACKET = 0x110;
 	public const CLIENT_CACHE_STATUS_PACKET = 0x81;
 	public const ON_SCREEN_TEXTURE_ANIMATION_PACKET = 0x82;
 	public const MAP_CREATE_LOCKED_COPY_PACKET = 0x83;

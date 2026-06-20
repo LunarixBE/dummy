@@ -37,13 +37,17 @@ class BlockPickRequestPacket extends DataPacket implements ServerboundPacket{
 
 	protected function decodePayload(PacketSerializer $in) : void{
 		$this->blockPosition = $in->getSignedBlockPosition();
-		$this->addUserData = $in->getBool();
+		if($in->getProtocolId() >= ProtocolInfo::PROTOCOL_1_16_0){
+			$this->addUserData = $in->getBool();
+		}
 		$this->hotbarSlot = $in->getByte();
 	}
 
 	protected function encodePayload(PacketSerializer $out) : void{
 		$out->putSignedBlockPosition($this->blockPosition);
-		$out->putBool($this->addUserData);
+		if($out->getProtocolId() >= ProtocolInfo::PROTOCOL_1_16_0){
+			$out->putBool($this->addUserData);
+		}
 		$out->putByte($this->hotbarSlot);
 	}
 

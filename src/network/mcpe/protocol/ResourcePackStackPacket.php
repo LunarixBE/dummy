@@ -61,6 +61,10 @@ class ResourcePackStackPacket extends DataPacket implements ClientboundPacket{
 			$this->resourcePackStack[] = ResourcePackStackEntry::read($in);
 		}
 
+		if($in->getProtocolId() <= ProtocolInfo::PROTOCOL_1_1_5){
+			return;
+		}
+
 		$this->baseGameVersion = $in->getString();
 		$this->experiments = Experiments::read($in);
 		if($in->getProtocolId() >= ProtocolInfo::PROTOCOL_1_20_80){
@@ -81,6 +85,10 @@ class ResourcePackStackPacket extends DataPacket implements ClientboundPacket{
 		$out->putUnsignedVarInt(count($this->resourcePackStack));
 		foreach($this->resourcePackStack as $entry){
 			$entry->write($out);
+		}
+
+		if($out->getProtocolId() <= ProtocolInfo::PROTOCOL_1_1_5){
+			return;
 		}
 
 		$out->putString($this->baseGameVersion);

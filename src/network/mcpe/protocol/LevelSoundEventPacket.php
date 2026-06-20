@@ -61,6 +61,17 @@ class LevelSoundEventPacket extends DataPacket implements ClientboundPacket, Ser
 	}
 
 	protected function decodePayload(PacketSerializer $in) : void{
+		if($in->getProtocolId() <= ProtocolInfo::PROTOCOL_1_1_5){
+			$this->sound = $in->getByte();
+			$this->position = $in->getVector3();
+			$this->extraData = $in->getVarInt();
+			$entityType = $in->getVarInt();
+			$this->entityType = $entityType === 319 ? "minecraft:player" : ":";
+			$this->isBabyMob = $in->getBool();
+			$this->disableRelativeVolume = $in->getBool();
+			return;
+		}
+
 		$this->sound = $in->getUnsignedVarInt();
 		$this->position = $in->getVector3();
 		$this->extraData = $in->getVarInt();
@@ -76,6 +87,16 @@ class LevelSoundEventPacket extends DataPacket implements ClientboundPacket, Ser
 	}
 
 	protected function encodePayload(PacketSerializer $out) : void{
+		if($out->getProtocolId() <= ProtocolInfo::PROTOCOL_1_1_5){
+			$out->putByte($this->sound & 0xff);
+			$out->putVector3($this->position);
+			$out->putVarInt($this->extraData);
+			$out->putVarInt($this->entityType === "minecraft:player" ? 319 : 1);
+			$out->putBool($this->isBabyMob);
+			$out->putBool($this->disableRelativeVolume);
+			return;
+		}
+
 		$out->putUnsignedVarInt($this->sound);
 		$out->putVector3($this->position);
 		$out->putVarInt($this->extraData);

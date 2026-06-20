@@ -90,6 +90,7 @@ final class BedrockDataFiles{
 	public const ENUMS_PY = BEDROCK_DATA_PATH . '/enums.py';
 	public const ITEM_TAGS_1_20_0_JSON = BEDROCK_DATA_PATH . '/item_tags-1.20.0.json';
 	public const ITEM_TAGS_JSON = BEDROCK_DATA_PATH . '/item_tags.json';
+	public const LEGACY_BLOCK_ID_MAP_1_1_5_JSON = BEDROCK_DATA_PATH . '/legacy_block_id_map-1.1.5.json';
 	public const LEVEL_SOUND_ID_MAP_JSON = BEDROCK_DATA_PATH . '/level_sound_id_map.json';
 	public const PROTOCOL_INFO_JSON = BEDROCK_DATA_PATH . '/protocol_info.json';
 	public const R12_TO_CURRENT_BLOCK_MAP_1_20_0_BIN = BEDROCK_DATA_PATH . '/r12_to_current_block_map-1.20.0.bin';

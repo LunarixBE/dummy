@@ -16,6 +16,7 @@ namespace pocketmine\network\mcpe\protocol;
 
 use pocketmine\network\mcpe\protocol\serializer\PacketSerializer;
 use pocketmine\network\mcpe\protocol\types\inventory\FullContainerName;
+use pocketmine\network\mcpe\protocol\types\inventory\ContainerIds;
 use pocketmine\network\mcpe\protocol\types\inventory\ItemStackWrapper;
 use function count;
 
@@ -45,9 +46,20 @@ class InventoryContentPacket extends DataPacket implements ClientboundPacket{
 
 	protected function decodePayload(PacketSerializer $in) : void{
 		$this->windowId = $in->getUnsignedVarInt();
+		if($in->getProtocolId() <= ProtocolInfo::PROTOCOL_1_1_5){
+			$in->getActorUniqueId();
+		}
 		$count = $in->getUnsignedVarInt();
 		for($i = 0; $i < $count; ++$i){
-			$this->items[] = ItemStackWrapper::read($in, true);
+			$this->items[] = $in->getProtocolId() <= ProtocolInfo::PROTOCOL_1_1_5 ?
+				ItemStackWrapper::legacy($in->getItemStackWithoutStackId()) :
+				ItemStackWrapper::read($in, true);
+		}
+		if($in->getProtocolId() <= ProtocolInfo::PROTOCOL_1_1_5){
+			for($i = 0, $hotbarCount = $in->getUnsignedVarInt(); $i < $hotbarCount; ++$i){
+				$in->getVarInt();
+			}
+			return;
 		}
 		if($in->getProtocolId() >= ProtocolInfo::PROTOCOL_1_21_30){
 			$this->containerName = FullContainerName::read($in);
@@ -63,6 +75,23 @@ class InventoryContentPacket extends DataPacket implements ClientboundPacket{
 
 	protected function encodePayload(PacketSerializer $out) : void{
 		$out->putUnsignedVarInt($this->windowId);
+		if($out->getProtocolId() <= ProtocolInfo::PROTOCOL_1_1_5){
+			$out->putActorUniqueId(0);
+			$out->putUnsignedVarInt(count($this->items));
+			foreach($this->items as $item){
+				$out->putItemStackWithoutStackId($item->getItemStack());
+			}
+			if($this->windowId === ContainerIds::INVENTORY){
+				$out->putUnsignedVarInt(9);
+				for($i = 0; $i < 9; ++$i){
+					$out->putVarInt($i);
+				}
+			}else{
+				$out->putUnsignedVarInt(0);
+			}
+			return;
+		}
+
 		$out->putUnsignedVarInt(count($this->items));
 		foreach($this->items as $item){
 			$item->write($out, true);;

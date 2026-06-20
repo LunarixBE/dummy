@@ -58,6 +58,8 @@ interface PacketHandlerInterface{
 
 	public function handlePassengerJump(PassengerJumpPacket $packet) : bool;
 
+	public function handleRemoveBlock(RemoveBlockPacket $packet) : bool;
+
 	public function handleUpdateBlock(UpdateBlockPacket $packet) : bool;
 
 	public function handleAddPainting(AddPaintingPacket $packet) : bool;
@@ -92,7 +94,15 @@ interface PacketHandlerInterface{
 
 	public function handleActorPickRequest(ActorPickRequestPacket $packet) : bool;
 
+	public function handleUseItem(UseItemPacket $packet) : bool;
+
 	public function handlePlayerAction(PlayerActionPacket $packet) : bool;
+
+	public function handleActorFall(ActorFallPacket $packet) : bool;
+
+	public function handleDropItem(DropItemPacket $packet) : bool;
+
+	public function handleInventoryAction(InventoryActionPacket $packet) : bool;
 
 	public function handleHurtArmor(HurtArmorPacket $packet) : bool;
 
@@ -173,6 +183,8 @@ interface PacketHandlerInterface{
 	public function handleAvailableCommands(AvailableCommandsPacket $packet) : bool;
 
 	public function handleCommandRequest(CommandRequestPacket $packet) : bool;
+
+	public function handleCommandStep(CommandStepPacket $packet) : bool;
 
 	public function handleCommandBlockUpdate(CommandBlockUpdatePacket $packet) : bool;
 

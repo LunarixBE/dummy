@@ -17,7 +17,10 @@ namespace pocketmine\network\mcpe\protocol;
 use pocketmine\color\Color;
 use pocketmine\network\mcpe\protocol\serializer\PacketSerializer;
 use pocketmine\network\mcpe\protocol\types\PlayerListEntry;
+use pocketmine\network\mcpe\protocol\types\skin\SkinData;
+use pocketmine\network\mcpe\protocol\types\skin\SkinImage;
 use function count;
+use function str_repeat;
 
 class PlayerListPacket extends DataPacket implements ClientboundPacket{
 	public const NETWORK_ID = ProtocolInfo::PLAYER_LIST_PACKET;
@@ -64,6 +67,18 @@ class PlayerListPacket extends DataPacket implements ClientboundPacket{
 				$entry->uuid = $in->getUUID();
 				$entry->actorUniqueId = $in->getActorUniqueId();
 				$entry->username = $in->getString();
+				if($in->getProtocolId() <= ProtocolInfo::PROTOCOL_1_1_5){
+					$skinId = $in->getString();
+					$skinData = $in->getString();
+					try{
+						$skinImage = SkinImage::fromLegacy($skinData);
+					}catch(\InvalidArgumentException){
+						$skinImage = new SkinImage(32, 64, str_repeat("\x00", 64 * 32 * 4));
+					}
+					$entry->skinData = new SkinData($skinId, "", "", $skinImage);
+					$this->entries[$i] = $entry;
+					continue;
+				}
 				$entry->xboxUserId = $in->getString();
 				$entry->platformChatId = $in->getString();
 				$entry->buildPlatform = $in->getLInt();
@@ -82,7 +97,7 @@ class PlayerListPacket extends DataPacket implements ClientboundPacket{
 
 			$this->entries[$i] = $entry;
 		}
-		if($this->type === self::TYPE_ADD){
+		if($this->type === self::TYPE_ADD && $in->getProtocolId() >= ProtocolInfo::PROTOCOL_1_16_0){
 			for($i = 0; $i < $count; ++$i){
 				$this->entries[$i]->skinData->setVerified($in->getBool());
 			}
@@ -97,6 +112,11 @@ class PlayerListPacket extends DataPacket implements ClientboundPacket{
 				$out->putUUID($entry->uuid);
 				$out->putActorUniqueId($entry->actorUniqueId);
 				$out->putString($entry->username);
+				if($out->getProtocolId() <= ProtocolInfo::PROTOCOL_1_1_5){
+					$out->putString($entry->skinData->getSkinId());
+					$out->putString($entry->skinData->getSkinImage()->getData());
+					continue;
+				}
 				$out->putString($entry->xboxUserId);
 				$out->putString($entry->platformChatId);
 				$out->putLInt($entry->buildPlatform);
@@ -113,7 +133,7 @@ class PlayerListPacket extends DataPacket implements ClientboundPacket{
 				$out->putUUID($entry->uuid);
 			}
 		}
-		if($this->type === self::TYPE_ADD){
+		if($this->type === self::TYPE_ADD && $out->getProtocolId() >= ProtocolInfo::PROTOCOL_1_16_0){
 			foreach($this->entries as $entry){
 				$out->putBool($entry->skinData->isVerified());
 			}

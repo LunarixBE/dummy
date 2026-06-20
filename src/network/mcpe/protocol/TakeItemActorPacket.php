@@ -33,11 +33,21 @@ class TakeItemActorPacket extends DataPacket implements ClientboundPacket{
 	}
 
 	protected function decodePayload(PacketSerializer $in) : void{
+		if($in->getProtocolId() <= ProtocolInfo::PROTOCOL_1_1_5){
+			$this->takerActorRuntimeId = $in->getActorRuntimeId();
+			$this->itemActorRuntimeId = $in->getActorRuntimeId();
+			return;
+		}
 		$this->itemActorRuntimeId = $in->getActorRuntimeId();
 		$this->takerActorRuntimeId = $in->getActorRuntimeId();
 	}
 
 	protected function encodePayload(PacketSerializer $out) : void{
+		if($out->getProtocolId() <= ProtocolInfo::PROTOCOL_1_1_5){
+			$out->putActorRuntimeId($this->takerActorRuntimeId);
+			$out->putActorRuntimeId($this->itemActorRuntimeId);
+			return;
+		}
 		$out->putActorRuntimeId($this->itemActorRuntimeId);
 		$out->putActorRuntimeId($this->takerActorRuntimeId);
 	}

@@ -243,8 +243,14 @@ class StartGamePacket extends DataPacket implements ClientboundPacket{
 		$out->putString($this->worldName);
 		$out->putString($this->premiumWorldTemplateId);
 		$out->putBool($this->isTrial);
-		$this->playerMovementSettings->write($out);
+		if($out->getProtocolId() >= ProtocolInfo::PROTOCOL_1_16_0){
+			$this->playerMovementSettings->write($out);
+		}
 		$out->putLLong($this->currentTick);
+
+		if($out->getProtocolId() <= ProtocolInfo::PROTOCOL_1_1_5){
+			return;
+		}
 
 		$out->putVarInt($this->enchantmentSeed);
 

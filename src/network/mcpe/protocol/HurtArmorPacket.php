@@ -35,7 +35,9 @@ class HurtArmorPacket extends DataPacket implements ClientboundPacket{
 	}
 
 	protected function decodePayload(PacketSerializer $in) : void{
-		$this->cause = $in->getVarInt();
+		if($in->getProtocolId() >= ProtocolInfo::PROTOCOL_1_16_0){
+			$this->cause = $in->getVarInt();
+		}
 		$this->health = $in->getVarInt();
 		if($in->getProtocolId() >= ProtocolInfo::PROTOCOL_1_17_30){
 			$this->armorSlotFlags = $in->getUnsignedVarLong();
@@ -43,7 +45,9 @@ class HurtArmorPacket extends DataPacket implements ClientboundPacket{
 	}
 
 	protected function encodePayload(PacketSerializer $out) : void{
-		$out->putVarInt($this->cause);
+		if($out->getProtocolId() >= ProtocolInfo::PROTOCOL_1_16_0){
+			$out->putVarInt($this->cause);
+		}
 		$out->putVarInt($this->health);
 		if($out->getProtocolId() >= ProtocolInfo::PROTOCOL_1_17_30){
 			$out->putUnsignedVarLong($this->armorSlotFlags);

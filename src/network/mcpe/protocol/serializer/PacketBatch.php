@@ -63,7 +63,7 @@ class PacketBatch{
 	final public static function decodePackets(BinaryStream $stream, int $protocolId, PacketPool $packetPool) : \Generator{
 		$c = 0;
 		foreach(self::decodeRaw($stream) as $packetBuffer){
-			$packet = $packetPool->getPacket($packetBuffer);
+			$packet = $packetPool->getPacket($packetBuffer, $protocolId);
 			if($packet !== null){
 				try{
 					$packet->decode(PacketSerializer::decoder($protocolId, $packetBuffer, 0));
@@ -82,7 +82,10 @@ class PacketBatch{
 	 * @param Packet[]       $packets
 	 * @phpstan-param list<Packet> $packets
 	 */
-	final public static function encodePackets(BinaryStream $stream, int $protocolId, array $packets) : void{
+	final public static function encodePackets(BinaryStream $stream, int|PacketSerializerContext $protocolId, array $packets) : void{
+		if($protocolId instanceof PacketSerializerContext){
+			$protocolId = $protocolId->getProtocolId();
+		}
 		foreach($packets as $packet){
 			$serializer = PacketSerializer::encoder($protocolId);
 			$packet->encode($serializer);

@@ -75,7 +75,11 @@ class PacketSerializer extends BinaryStream{
 		//overridden to change visibility
 		parent::__construct($buffer, $offset);
 
-		$this->shieldItemRuntimeId = TypeConverter::getInstance($protocolId)->getItemTypeDictionary()->fromStringId("minecraft:shield");
+		try{
+			$this->shieldItemRuntimeId = TypeConverter::getInstance($protocolId)->getItemTypeDictionary()->fromStringId("minecraft:shield");
+		}catch(\InvalidArgumentException){
+			$this->shieldItemRuntimeId = PHP_INT_MIN;
+		}
 	}
 
 	public static function encoder(int $protocolId) : self{
@@ -397,6 +401,9 @@ class PacketSerializer extends BinaryStream{
 			$auxValue = $this->getVarInt();
 			$count = $auxValue & 0xff;
 			$meta = $auxValue >> 8;
+			if($this->getProtocolId() <= ProtocolInfo::PROTOCOL_1_1_5 && $meta === 0x7fff){
+				$meta = -1;
+			}
 
 			$blockRuntimeId = 0; // TODO: somehow get a runtime id?
 			$extraData = $this;
@@ -441,7 +448,16 @@ class PacketSerializer extends BinaryStream{
 
 		/** @var CompoundTag|null $compound */
 		$compound = null;
-		if($nbtLen === 0xffff){
+		if($serializer->getProtocolId() <= ProtocolInfo::PROTOCOL_1_1_5){
+			if($nbtLen !== 0){
+				$offset = 0;
+				try{
+					$compound = (new LittleEndianNbtSerializer())->read($serializer->get($nbtLen), $offset, 512)->mustGetCompoundTag();
+				}catch(NbtDataException $e){
+					throw PacketDecodeException::wrap($e, "Failed decoding legacy NBT root");
+				}
+			}
+		}elseif($nbtLen === 0xffff){
 			$nbtDataVersion = $serializer->getByte();
 			if($nbtDataVersion !== 1){
 				throw new PacketDecodeException("Unexpected NBT data version $nbtDataVersion");
@@ -518,9 +534,15 @@ class PacketSerializer extends BinaryStream{
 
 		$nbt = $item->getNbt();
 		if($nbt !== null){
-			$serializer->putLShort(0xffff);
-			$serializer->putByte(1); //TODO: NBT data version (?)
-			$serializer->put((new $nbtSerializerClass())->write(new TreeRoot($nbt)));
+			if($serializer->getProtocolId() <= ProtocolInfo::PROTOCOL_1_1_5){
+				$nbtData = (new LittleEndianNbtSerializer())->write(new TreeRoot($nbt));
+				$serializer->putLShort(strlen($nbtData));
+				$serializer->put($nbtData);
+			}else{
+				$serializer->putLShort(0xffff);
+				$serializer->putByte(1); //TODO: NBT data version (?)
+				$serializer->put((new $nbtSerializerClass())->write(new TreeRoot($nbt)));
+			}
 		}else{
 			$serializer->putLShort(0);
 		}

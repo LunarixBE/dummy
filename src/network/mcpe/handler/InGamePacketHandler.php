@@ -47,6 +47,7 @@ use pocketmine\nbt\tag\StringTag;
 use pocketmine\network\mcpe\InventoryManager;
 use pocketmine\network\mcpe\NetworkSession;
 use pocketmine\network\mcpe\protocol\ActorEventPacket;
+use pocketmine\network\mcpe\protocol\ActorFallPacket;
 use pocketmine\network\mcpe\protocol\ActorPickRequestPacket;
 use pocketmine\network\mcpe\protocol\AdventureSettingsPacket;
 use pocketmine\network\mcpe\protocol\AnimatePacket;
@@ -56,10 +57,13 @@ use pocketmine\network\mcpe\protocol\BookEditPacket;
 use pocketmine\network\mcpe\protocol\BossEventPacket;
 use pocketmine\network\mcpe\protocol\CommandBlockUpdatePacket;
 use pocketmine\network\mcpe\protocol\CommandRequestPacket;
+use pocketmine\network\mcpe\protocol\CommandStepPacket;
 use pocketmine\network\mcpe\protocol\ContainerClosePacket;
 use pocketmine\network\mcpe\protocol\CraftingEventPacket;
+use pocketmine\network\mcpe\protocol\DropItemPacket;
 use pocketmine\network\mcpe\protocol\EmotePacket;
 use pocketmine\network\mcpe\protocol\InteractPacket;
+use pocketmine\network\mcpe\protocol\InventoryActionPacket;
 use pocketmine\network\mcpe\protocol\InventoryTransactionPacket;
 use pocketmine\network\mcpe\protocol\ItemStackRequestPacket;
 use pocketmine\network\mcpe\protocol\ItemStackResponsePacket;
@@ -80,6 +84,7 @@ use pocketmine\network\mcpe\protocol\PlayerSkinPacket;
 use pocketmine\network\mcpe\protocol\ProtocolInfo;
 use pocketmine\network\mcpe\protocol\RequestAbilityPacket;
 use pocketmine\network\mcpe\protocol\RequestChunkRadiusPacket;
+use pocketmine\network\mcpe\protocol\RemoveBlockPacket;
 use pocketmine\network\mcpe\protocol\serializer\BitSet;
 use pocketmine\network\mcpe\protocol\ServerboundDiagnosticsPacket;
 use pocketmine\network\mcpe\protocol\ServerSettingsRequestPacket;
@@ -89,6 +94,7 @@ use pocketmine\network\mcpe\protocol\ShowCreditsPacket;
 use pocketmine\network\mcpe\protocol\SpawnExperienceOrbPacket;
 use pocketmine\network\mcpe\protocol\SubClientLoginPacket;
 use pocketmine\network\mcpe\protocol\TextPacket;
+use pocketmine\network\mcpe\protocol\UseItemPacket;
 use pocketmine\network\mcpe\protocol\types\ActorEvent;
 use pocketmine\network\mcpe\protocol\types\BlockPosition;
 use pocketmine\network\mcpe\protocol\types\inventory\ContainerIds;
@@ -118,15 +124,19 @@ use function fmod;
 use function get_debug_type;
 use function implode;
 use function in_array;
+use function is_array;
 use function is_bool;
 use function is_infinite;
 use function is_nan;
+use function is_scalar;
 use function json_decode;
+use function json_encode;
 use function max;
 use function mb_strlen;
 use function microtime;
 use function sprintf;
 use function str_starts_with;
+use function strval;
 use function strlen;
 use const JSON_THROW_ON_ERROR;
 
@@ -363,6 +373,53 @@ class InGamePacketHandler extends PacketHandler{
 
 		$this->inventoryManager->setCurrentItemStackRequestId(null);
 		return $result;
+	}
+
+	public function handleUseItem(UseItemPacket $packet) : bool{
+		$this->player->selectHotbarSlot($packet->hotbarSlot);
+
+		if($packet->face >= 0){
+			self::validateFacing($packet->face);
+			$blockPos = $packet->blockPosition;
+			$this->player->interactBlock(new Vector3($blockPos->getX(), $blockPos->getY(), $blockPos->getZ()), $packet->face, $packet->clickPosition);
+			return true;
+		}
+
+		$this->player->useHeldItem();
+		return true;
+	}
+
+	public function handleRemoveBlock(RemoveBlockPacket $packet) : bool{
+		$pos = $packet->blockPosition;
+		$this->player->breakBlock(new Vector3($pos->getX(), $pos->getY(), $pos->getZ()));
+		return true;
+	}
+
+	public function handleDropItem(DropItemPacket $packet) : bool{
+		$item = $this->session->getTypeConverter()->netItemStackToCore($packet->item->getItemStack());
+		if($item->isNull()){
+			return true;
+		}
+
+		$inventory = $this->player->getInventory();
+		if(!$inventory->contains($item)){
+			return false;
+		}
+		if(count($inventory->removeItem($item)) !== 0){
+			return false;
+		}
+
+		$this->player->dropItem($item);
+		return true;
+	}
+
+	public function handleActorFall(ActorFallPacket $packet) : bool{
+		return true;
+	}
+
+	public function handleInventoryAction(InventoryActionPacket $packet) : bool{
+		$this->inventoryManager->requestSyncAll();
+		return true;
 	}
 
 	private function executeInventoryTransaction(InventoryTransaction $transaction, int $requestId) : bool{
@@ -895,6 +952,41 @@ class InGamePacketHandler extends PacketHandler{
 			return true;
 		}
 		return false;
+	}
+
+	public function handleCommandStep(CommandStepPacket $packet) : bool{
+		if(!$packet->done || $packet->command === ""){
+			return true;
+		}
+
+		$arguments = [];
+		if(is_array($packet->inputJson)){
+			foreach($packet->inputJson as $value){
+				if(is_array($value)){
+					if(isset($value["x"], $value["y"], $value["z"])){
+						$arguments[] = $value["x"] . " " . $value["y"] . " " . $value["z"];
+					}elseif(isset($value["rules"][0]["value"])){
+						$arguments[] = strval($value["rules"][0]["value"]);
+					}elseif(isset($value["rotation"])){
+						$arguments[] = strval($value["rotation"]);
+					}else{
+						$encoded = json_encode($value);
+						if($encoded !== false){
+							$arguments[] = $encoded;
+						}
+					}
+				}elseif(is_scalar($value)){
+					$arguments[] = strval($value);
+				}
+			}
+		}
+
+		$command = "/" . $packet->command;
+		if($arguments !== []){
+			$command .= " " . implode(" ", $arguments);
+		}
+		$this->player->chat($command);
+		return true;
 	}
 
 	public function handleCommandBlockUpdate(CommandBlockUpdatePacket $packet) : bool{

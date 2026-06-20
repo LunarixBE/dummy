@@ -72,7 +72,9 @@ class AddItemActorPacket extends DataPacket implements ClientboundPacket{
 		$this->position = $in->getVector3();
 		$this->motion = $in->getVector3();
 		$this->metadata = $in->getEntityMetadata();
-		$this->isFromFishing = $in->getBool();
+		if($in->getProtocolId() >= ProtocolInfo::PROTOCOL_1_16_0){
+			$this->isFromFishing = $in->getBool();
+		}
 	}
 
 	protected function encodePayload(PacketSerializer $out) : void{
@@ -87,8 +89,10 @@ class AddItemActorPacket extends DataPacket implements ClientboundPacket{
 		
 		$out->putVector3($this->position);
 		$out->putVector3Nullable($this->motion);
-		$out->putEntityMetadata($this->metadata);
-		$out->putBool($this->isFromFishing);
+		$out->putEntityMetadata($out->getProtocolId() <= ProtocolInfo::PROTOCOL_1_1_5 ? [] : $this->metadata);
+		if($out->getProtocolId() >= ProtocolInfo::PROTOCOL_1_16_0){
+			$out->putBool($this->isFromFishing);
+		}
 	}
 
 	public function handle(PacketHandlerInterface $handler) : bool{

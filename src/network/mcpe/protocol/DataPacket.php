@@ -14,6 +14,7 @@ declare(strict_types=1);
 
 namespace pocketmine\network\mcpe\protocol;
 
+use pocketmine\network\mcpe\convert\PacketIdTranslator;
 use pocketmine\network\mcpe\protocol\serializer\PacketSerializer;
 use pocketmine\utils\BinaryDataException;
 use function get_class;
@@ -60,14 +61,21 @@ abstract class DataPacket implements Packet{
 	 * @throws PacketDecodeException
 	 */
 	protected function decodeHeader(PacketSerializer $in) : void{
-		$header = $in->getUnsignedVarInt();
-		$pid = $header & self::PID_MASK;
+		if($in->getProtocolId() <= ProtocolInfo::PROTOCOL_1_1_5){
+			$pid = PacketIdTranslator::fromNetworkId($in->getProtocolId(), $in->getByte());
+			$header = $pid;
+		}else{
+			$header = $in->getUnsignedVarInt();
+			$pid = $header & self::PID_MASK;
+		}
 		if($pid !== static::NETWORK_ID){
 			//TODO: this means a logical error in the code, but how to prevent it from happening?
 			throw new PacketDecodeException("Expected " . static::NETWORK_ID . " for packet ID, got $pid");
 		}
-		$this->senderSubId = ($header >> self::SENDER_SUBCLIENT_ID_SHIFT) & self::SUBCLIENT_ID_MASK;
-		$this->recipientSubId = ($header >> self::RECIPIENT_SUBCLIENT_ID_SHIFT) & self::SUBCLIENT_ID_MASK;
+		if($in->getProtocolId() > ProtocolInfo::PROTOCOL_1_1_5){
+			$this->senderSubId = ($header >> self::SENDER_SUBCLIENT_ID_SHIFT) & self::SUBCLIENT_ID_MASK;
+			$this->recipientSubId = ($header >> self::RECIPIENT_SUBCLIENT_ID_SHIFT) & self::SUBCLIENT_ID_MASK;
+		}
 
 	}
 
@@ -85,11 +93,16 @@ abstract class DataPacket implements Packet{
 	}
 
 	protected function encodeHeader(PacketSerializer $out) : void{
-		$out->putUnsignedVarInt(
-			static::NETWORK_ID |
-			($this->senderSubId << self::SENDER_SUBCLIENT_ID_SHIFT) |
-			($this->recipientSubId << self::RECIPIENT_SUBCLIENT_ID_SHIFT)
-		);
+		$networkId = PacketIdTranslator::toNetworkId($out->getProtocolId(), static::NETWORK_ID);
+		if($out->getProtocolId() <= ProtocolInfo::PROTOCOL_1_1_5){
+			$out->putByte($networkId);
+		}else{
+			$out->putUnsignedVarInt(
+				$networkId |
+				($this->senderSubId << self::SENDER_SUBCLIENT_ID_SHIFT) |
+				($this->recipientSubId << self::RECIPIENT_SUBCLIENT_ID_SHIFT)
+			);
+		}
 	}
 
 	/**

@@ -22,6 +22,7 @@ class LoginPacket extends DataPacket implements ServerboundPacket{
 	public const NETWORK_ID = ProtocolInfo::LOGIN_PACKET;
 
 	public int $protocol;
+	public int $gameEdition = 0;
 	public string $authInfoJson;
 	public string $clientDataJwt;
 
@@ -42,6 +43,13 @@ class LoginPacket extends DataPacket implements ServerboundPacket{
 
 	protected function decodePayload(PacketSerializer $in) : void{
 		$this->protocol = $in->getInt();
+		if($this->protocol === 0 && $in->getOffset() >= 4){
+			$in->setOffset($in->getOffset() - 2);
+			$this->protocol = $in->getInt();
+		}
+		if($this->protocol <= ProtocolInfo::PROTOCOL_1_1_5){
+			$this->gameEdition = $in->getByte();
+		}
 		$this->decodeConnectionRequest($in->getString());
 	}
 

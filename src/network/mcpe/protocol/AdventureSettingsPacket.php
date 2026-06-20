@@ -72,6 +72,13 @@ class AdventureSettingsPacket extends DataPacket implements ClientboundPacket, S
 	protected function decodePayload(PacketSerializer $in) : void{
 		$this->flags = $in->getUnsignedVarInt();
 		$this->commandPermission = $in->getUnsignedVarInt();
+		if($in->getProtocolId() <= ProtocolInfo::PROTOCOL_1_1_5){
+			$this->flags2 = 0;
+			$this->playerPermission = PlayerPermissions::MEMBER;
+			$this->customFlags = 0;
+			$this->targetActorUniqueId = 0;
+			return;
+		}
 		$this->flags2 = $in->getUnsignedVarInt();
 		$this->playerPermission = $in->getUnsignedVarInt();
 		$this->customFlags = $in->getUnsignedVarInt();
@@ -81,6 +88,9 @@ class AdventureSettingsPacket extends DataPacket implements ClientboundPacket, S
 	protected function encodePayload(PacketSerializer $out) : void{
 		$out->putUnsignedVarInt($this->flags);
 		$out->putUnsignedVarInt($this->commandPermission);
+		if($out->getProtocolId() <= ProtocolInfo::PROTOCOL_1_1_5){
+			return;
+		}
 		$out->putUnsignedVarInt($this->flags2);
 		$out->putUnsignedVarInt($this->playerPermission);
 		$out->putUnsignedVarInt($this->customFlags);

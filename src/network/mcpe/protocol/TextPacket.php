@@ -100,6 +100,37 @@ class TextPacket extends DataPacket implements ClientboundPacket, ServerboundPac
 	}
 
 	protected function decodePayload(PacketSerializer $in) : void{
+		if($in->getProtocolId() <= ProtocolInfo::PROTOCOL_1_1_5){
+			$this->type = $in->getByte();
+			switch($this->type){
+				case self::TYPE_CHAT:
+				case self::TYPE_WHISPER:
+				case self::TYPE_ANNOUNCEMENT:
+					$this->sourceName = $in->getString();
+				case self::TYPE_RAW:
+				case self::TYPE_TIP:
+				case self::TYPE_SYSTEM:
+				case self::TYPE_JSON_WHISPER:
+				case self::TYPE_JSON:
+				case self::TYPE_JSON_ANNOUNCEMENT:
+					$this->message = $in->getString();
+					break;
+				case self::TYPE_POPUP:
+					$this->sourceName = $in->getString();
+					$this->message = $in->getString();
+					break;
+				case self::TYPE_TRANSLATION:
+				case self::TYPE_JUKEBOX_POPUP:
+					$this->message = $in->getString();
+					$count = $in->getUnsignedVarInt();
+					for($i = 0; $i < $count; ++$i){
+						$this->parameters[] = $in->getString();
+					}
+					break;
+			}
+			return;
+		}
+
 		if ($in->getProtocolId() >= ProtocolInfo::PROTOCOL_1_21_130) {
 			$this->needsTranslation = $in->getBool();
 			$type = $in->getByte();
@@ -177,6 +208,37 @@ class TextPacket extends DataPacket implements ClientboundPacket, ServerboundPac
 	}
 
 	protected function encodePayload(PacketSerializer $out) : void{
+		if($out->getProtocolId() <= ProtocolInfo::PROTOCOL_1_1_5){
+			$out->putByte($this->type);
+			switch($this->type){
+				case self::TYPE_CHAT:
+				case self::TYPE_WHISPER:
+				case self::TYPE_ANNOUNCEMENT:
+					$out->putString($this->sourceName);
+				case self::TYPE_RAW:
+				case self::TYPE_TIP:
+				case self::TYPE_SYSTEM:
+				case self::TYPE_JSON_WHISPER:
+				case self::TYPE_JSON:
+				case self::TYPE_JSON_ANNOUNCEMENT:
+					$out->putString($this->message);
+					break;
+				case self::TYPE_POPUP:
+					$out->putString($this->sourceName ?? "");
+					$out->putString($this->message);
+					break;
+				case self::TYPE_TRANSLATION:
+				case self::TYPE_JUKEBOX_POPUP:
+					$out->putString($this->message);
+					$out->putUnsignedVarInt(count($this->parameters));
+					foreach($this->parameters as $p){
+						$out->putString($p);
+					}
+					break;
+			}
+			return;
+		}
+
 		if ($out->getProtocolId() < ProtocolInfo::PROTOCOL_1_21_130) {
 			$out->putByte($this->type);
 		}

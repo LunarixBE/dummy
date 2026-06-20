@@ -99,6 +99,25 @@ final class LevelSettings{
 	 * @throws PacketDecodeException
 	 */
 	private function internalRead(PacketSerializer $in) : void{
+		if($in->getProtocolId() <= ProtocolInfo::PROTOCOL_1_1_5){
+			$this->seed = $in->getVarInt();
+			$this->spawnSettings = SpawnSettings::read($in);
+			$this->generator = $in->getVarInt();
+			$this->worldGamemode = $in->getVarInt();
+			$this->difficulty = $in->getVarInt();
+			$this->spawnPosition = $in->getBlockPosition(false);
+			$this->hasAchievementsDisabled = $in->getBool();
+			$this->time = $in->getVarInt();
+			$this->hasEduFeaturesEnabled = $in->getBool();
+			$this->rainLevel = $in->getLFloat();
+			$this->lightningLevel = $in->getLFloat();
+			$this->commandsEnabled = $in->getBool();
+			$this->isTexturePacksRequired = $in->getBool();
+			$this->gameRules = $in->getGameRules(true);
+			$this->experiments = new Experiments([], false);
+			return;
+		}
+
 		if($in->getProtocolId() >= ProtocolInfo::PROTOCOL_1_18_30){
 			$this->seed = $in->getLLong();
 		}else{
@@ -182,6 +201,24 @@ final class LevelSettings{
 	}
 
 	public function write(PacketSerializer $out) : void{
+		if($out->getProtocolId() <= ProtocolInfo::PROTOCOL_1_1_5){
+			$out->putVarInt($this->seed);
+			$this->spawnSettings->write($out);
+			$out->putVarInt($this->generator);
+			$out->putVarInt($this->worldGamemode);
+			$out->putVarInt($this->difficulty);
+			$out->putBlockPosition($this->spawnPosition, false);
+			$out->putBool($this->hasAchievementsDisabled);
+			$out->putVarInt($this->time);
+			$out->putBool($this->hasEduFeaturesEnabled);
+			$out->putLFloat($this->rainLevel);
+			$out->putLFloat($this->lightningLevel);
+			$out->putBool($this->commandsEnabled);
+			$out->putBool($this->isTexturePacksRequired);
+			$out->putGameRules($this->gameRules, true);
+			return;
+		}
+
 		if($out->getProtocolId() >= ProtocolInfo::PROTOCOL_1_18_30){
 			$out->putLLong($this->seed);
 		}else{

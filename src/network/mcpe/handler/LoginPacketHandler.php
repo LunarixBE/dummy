@@ -47,6 +47,7 @@ use pocketmine\Server;
 use Ramsey\Uuid\Uuid;
 use Ramsey\Uuid\UuidInterface;
 use function base64_decode;
+use function base64_encode;
 use function chr;
 use function gettype;
 use function in_array;
@@ -324,6 +325,13 @@ class LoginPacketHandler extends PacketHandler{
 		}catch(\JsonException $e){
 			throw PacketHandlingException::wrap($e);
 		}
+		if(is_object($jwtChainJson) && isset($jwtChainJson->Certificate) && is_string($jwtChainJson->Certificate)){
+			try{
+				$jwtChainJson = json_decode($jwtChainJson->Certificate, associative: false, flags: JSON_THROW_ON_ERROR);
+			}catch(\JsonException $e){
+				throw PacketHandlingException::wrap($e, "Error parsing legacy login certificate");
+			}
+		}
 		if(!is_object($jwtChainJson)){
 			throw new \RuntimeException("Unexpected type for JWT chain data: " . gettype($jwtChainJson) . ", expected object");
 		}
@@ -361,6 +369,7 @@ class LoginPacketHandler extends PacketHandler{
 				if(!is_array($claims["extraData"])){
 					throw new PacketHandlingException("'extraData' key should be an array");
 				}
+				$claims["extraData"]["XUID"] ??= "";
 				$mapper = new \JsonMapper();
 				$mapper->bEnforceMapType = false; //TODO: we don't really need this as an array, but right now we don't have enough models
 				$mapper->bExceptionOnMissingData = true;
@@ -389,10 +398,46 @@ class LoginPacketHandler extends PacketHandler{
 		}catch(JwtException $e){
 			throw PacketHandlingException::wrap($e);
 		}
+		if($this->session->getProtocolId() <= ProtocolInfo::PROTOCOL_1_1_5){
+			$clientDataClaims["SkinGeometryData"] ??= $clientDataClaims["SkinGeometry"] ?? base64_encode("{}");
+			$clientDataClaims["SkinResourcePatch"] ??= base64_encode('{"geometry":{"default":"geometry.humanoid.custom"}}');
+			$clientDataClaims["SkinAnimationData"] ??= base64_encode("");
+			$clientDataClaims["AnimatedImageData"] ??= [];
+			$clientDataClaims["PersonaPieces"] ??= [];
+			$clientDataClaims["PieceTintColors"] ??= [];
+			$clientDataClaims["CapeData"] ??= base64_encode("");
+			$clientDataClaims["CapeId"] ??= "";
+			$clientDataClaims["CapeImageHeight"] ??= 0;
+			$clientDataClaims["CapeImageWidth"] ??= 0;
+			$clientDataClaims["CapeOnClassicSkin"] ??= false;
+			$clientDataClaims["ArmSize"] ??= "wide";
+			$clientDataClaims["SkinColor"] ??= "#0";
+			$clientDataClaims["PersonaSkin"] ??= false;
+			$clientDataClaims["PremiumSkin"] ??= false;
+			$clientDataClaims["PlatformOfflineId"] ??= "";
+			$clientDataClaims["PlatformOnlineId"] ??= "";
+			$clientDataClaims["ThirdPartyNameOnly"] ??= false;
+			$clientDataClaims["UIProfile"] ??= 0;
+			$clientDataClaims["CurrentInputMode"] ??= 0;
+			$clientDataClaims["DefaultInputMode"] ??= 0;
+			$clientDataClaims["DeviceId"] ??= "";
+			$clientDataClaims["DeviceModel"] ??= "";
+			$clientDataClaims["DeviceOS"] ??= 0;
+			$clientDataClaims["GuiScale"] ??= 0;
+			$clientDataClaims["LanguageCode"] ??= "en_US";
+			$clientDataClaims["GameVersion"] ??= "1.1.5";
+			$clientDataClaims["SelfSignedId"] ??= "";
+			$clientDataClaims["ServerAddress"] ??= "";
+			$clientDataClaims["SkinId"] ??= "";
+			$clientDataClaims["SkinImageHeight"] ??= 32;
+			$clientDataClaims["SkinImageWidth"] ??= 64;
+			$clientDataClaims["SkinData"] ??= base64_encode(str_repeat("\x00", 64 * 32 * 4));
+			$clientDataClaims["ThirdPartyName"] ??= $clientDataClaims["ThirdPartyName"] ?? "";
+		}
 
 		$mapper = new \JsonMapper();
 		$mapper->bEnforceMapType = false; //TODO: we don't really need this as an array, but right now we don't have enough models
-		$mapper->bExceptionOnMissingData = true;
+		$mapper->bExceptionOnMissingData = $this->session->getProtocolId() > ProtocolInfo::PROTOCOL_1_1_5;
 		$mapper->bExceptionOnUndefinedProperty = false;
 		$mapper->bRemoveUndefinedAttributes = true;
 		$mapper->bStrictObjectTypeChecking = true;
