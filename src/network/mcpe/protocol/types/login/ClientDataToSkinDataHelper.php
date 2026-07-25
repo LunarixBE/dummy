@@ -50,26 +50,41 @@ final class ClientDataToSkinDataHelper{
 	 * @throws \InvalidArgumentException
 	 */
 	public static function fromClientData(ClientData $clientData) : SkinData{
-		$skinBytes = self::safeB64Decode($clientData->SkinData, "SkinData");
-		$capeBytes = self::safeB64Decode($clientData->CapeData, "CapeData");
-		$resourcePatch = $clientData->SkinResourcePatch !== "" ?
-			self::safeB64Decode($clientData->SkinResourcePatch, "SkinResourcePatch") :
-			json_encode(["geometry" => ["default" => $clientData->SkinGeometryName !== "" ? $clientData->SkinGeometryName : "geometry.humanoid.custom"]], JSON_THROW_ON_ERROR);
-		$geometryData = $clientData->SkinGeometryData !== "" ?
-			self::safeB64Decode($clientData->SkinGeometryData, "SkinGeometryData") :
-			self::safeB64Decode($clientData->SkinGeometry, "SkinGeometry");
-		$skinImage = $clientData->SkinImageHeight > 0 && $clientData->SkinImageWidth > 0 ?
-			new SkinImage($clientData->SkinImageHeight, $clientData->SkinImageWidth, $skinBytes) :
+		$skinBytes = self::safeB64Decode($clientData->SkinData ?? "", "SkinData");
+		$capeBytes = self::safeB64Decode($clientData->CapeData ?? "", "CapeData");
+
+		$skinResourcePatch = $clientData->SkinResourcePatch ?? "";
+		$skinGeometryName = $clientData->SkinGeometryName ?? "";
+		$resourcePatch = $skinResourcePatch !== "" ?
+			self::safeB64Decode($skinResourcePatch, "SkinResourcePatch") :
+			json_encode(["geometry" => ["default" => $skinGeometryName !== "" ? $skinGeometryName : "geometry.humanoid.custom"]], JSON_THROW_ON_ERROR);
+
+		$skinGeometryData = $clientData->SkinGeometryData ?? "";
+		$geometryData = $skinGeometryData !== "" ?
+			self::safeB64Decode($skinGeometryData, "SkinGeometryData") :
+			self::safeB64Decode($clientData->SkinGeometry ?? "", "SkinGeometry");
+
+		$skinImageHeight = $clientData->SkinImageHeight ?? 0;
+		$skinImageWidth = $clientData->SkinImageWidth ?? 0;
+		$skinImage = $skinImageHeight > 0 && $skinImageWidth > 0 ?
+			new SkinImage($skinImageHeight, $skinImageWidth, $skinBytes) :
 			SkinImage::fromLegacy($skinBytes);
+
+		$capeImageHeight = $clientData->CapeImageHeight ?? 0;
+		$capeImageWidth = $clientData->CapeImageWidth ?? 0;
 		$capeImage = $capeBytes !== "" ?
-			($clientData->CapeImageHeight > 0 && $clientData->CapeImageWidth > 0 ?
-				new SkinImage($clientData->CapeImageHeight, $clientData->CapeImageWidth, $capeBytes) :
+			($capeImageHeight > 0 && $capeImageWidth > 0 ?
+				new SkinImage($capeImageHeight, $capeImageWidth, $capeBytes) :
 				SkinImage::fromLegacy($capeBytes)) :
 			new SkinImage(0, 0, "");
+		$skinAnimationData = $clientData->SkinAnimationData ?? "";
+		if($skinAnimationData === ""){
+			$skinAnimationData = $clientData->AnimationData ?? "";
+		}
 
 		/** @var SkinAnimation[] $animations */
 		$animations = [];
-		foreach($clientData->AnimatedImageData as $k => $animation){
+		foreach($clientData->AnimatedImageData ?? [] as $k => $animation){
 			$animations[] = new SkinAnimation(
 				new SkinImage(
 					$animation->ImageHeight,
@@ -82,7 +97,7 @@ final class ClientDataToSkinDataHelper{
 			);
 		}
 		return new SkinData(
-			$clientData->SkinId,
+			$clientData->SkinId ?? "Standard_Custom",
 			$clientData->PlayFabId ?? "",
 			$resourcePatch,
 			$skinImage,
@@ -90,21 +105,21 @@ final class ClientDataToSkinDataHelper{
 			$capeImage,
 			$geometryData,
 			self::safeB64Decode($clientData->SkinGeometryDataEngineVersion ?? "", "SkinGeometryDataEngineVersion"), //yes, they actually base64'd the version!
-			self::safeB64Decode($clientData->SkinAnimationData, "SkinAnimationData"),
-			$clientData->CapeId,
+			self::safeB64Decode($skinAnimationData, "SkinAnimationData"),
+			$clientData->CapeId ?? "",
 			null,
-			$clientData->ArmSize,
-			$clientData->SkinColor,
+			$clientData->ArmSize ?? SkinData::ARM_SIZE_WIDE,
+			$clientData->SkinColor ?? "",
 			array_map(function(ClientDataPersonaSkinPiece $piece) : PersonaSkinPiece{
 				return new PersonaSkinPiece($piece->PieceId, $piece->PieceType, $piece->PackId, $piece->IsDefault, $piece->ProductId);
-			}, $clientData->PersonaPieces),
+			}, $clientData->PersonaPieces ?? []),
 			array_map(function(ClientDataPersonaPieceTintColor $tint) : PersonaPieceTintColor{
 				return new PersonaPieceTintColor($tint->PieceType, $tint->Colors);
-			}, $clientData->PieceTintColors),
+			}, $clientData->PieceTintColors ?? []),
 			true,
-			$clientData->PremiumSkin,
-			$clientData->PersonaSkin,
-			$clientData->CapeOnClassicSkin,
+			$clientData->PremiumSkin ?? false,
+			$clientData->PersonaSkin ?? false,
+			$clientData->CapeOnClassicSkin ?? false,
 			true, //assume this is true? there's no field for it ...
 			$clientData->OverrideSkin ?? true,
 		);

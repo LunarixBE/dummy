@@ -149,6 +149,9 @@ final class ClientData{
 	/** @required */
 	public string $SkinAnimationData = "";
 
+	/** <= ProtocolInfo::PROTOCOL_1_12_0 */
+	public string $AnimationData = "";
+
 	/** @required */
 	public string $SkinColor = "";
 
