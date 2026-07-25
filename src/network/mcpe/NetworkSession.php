@@ -439,7 +439,7 @@ class NetworkSession{
 				$stream = new BinaryStream($decompressed);
 				foreach(PacketBatch::decodeRaw($stream) as $buffer){
 					$this->gamePacketLimiter->decrement();
-					$packet = $this->packetPool->getPacket($buffer);
+					$packet = $this->packetPool->getPacket($buffer, $this->getProtocolId());
 					if($packet === null){
 						$this->logger->debug("Unknown packet: " . base64_encode($buffer));
 						throw new PacketHandlingException("Unknown packet received");
@@ -1257,6 +1257,9 @@ class NetworkSession{
 	}
 
 	public function onCloseAllForms() : void{
+		if($this->getProtocolId() < ProtocolInfo::PROTOCOL_1_16_0){
+			return;
+		}
 		$this->sendDataPacket(ClientboundCloseFormPacket::create());
 	}
 
@@ -1378,6 +1381,9 @@ class NetworkSession{
 	}
 
 	public function onToastNotification(string $title, string $body) : void{
+		if($this->getProtocolId() < ProtocolInfo::PROTOCOL_1_16_0){
+			return;
+		}
 		$this->sendDataPacket(ToastRequestPacket::create($title, $body));
 	}
 
@@ -1388,6 +1394,9 @@ class NetworkSession{
 	}
 
 	public function onItemCooldownChanged(Item $item, int $ticks) : void{
+		if($this->getProtocolId() < ProtocolInfo::PROTOCOL_1_16_0){
+			return;
+		}
 		$this->sendDataPacket(PlayerStartItemCooldownPacket::create(
 			GlobalItemDataHandlers::getSerializer()->serializeType($item)->getName(),
 			$ticks

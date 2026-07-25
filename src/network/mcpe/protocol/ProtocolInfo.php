@@ -95,9 +95,12 @@ final class ProtocolInfo{
 	public const PROTOCOL_1_16_100 = 419;
 	public const PROTOCOL_1_16_20 = 408;
 	public const PROTOCOL_1_16_0 = 407;
+	public const PROTOCOL_1_12_0 = 361;
+	public const PROTOCOL_1_12_1 = self::PROTOCOL_1_12_0;
 
 	public const CURRENT_PROTOCOL = self::PROTOCOL_1_26_30;
 	public const ACCEPTED_PROTOCOL = [
+		self::PROTOCOL_1_12_0,
 		self::PROTOCOL_1_16_20,
 		self::PROTOCOL_1_16_100,
 		self::PROTOCOL_1_16_200,

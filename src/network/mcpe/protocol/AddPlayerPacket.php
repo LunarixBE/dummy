@@ -159,7 +159,11 @@ class AddPlayerPacket extends DataPacket implements ClientboundPacket{
 		}
 
 		$this->deviceId = $in->getString();
-		$this->buildPlatform = $in->getLInt();
+		if($in->getProtocolId() >= ProtocolInfo::PROTOCOL_1_16_0){
+			$this->buildPlatform = $in->getLInt();
+		}else{
+			$this->buildPlatform = DeviceOS::UNKNOWN;
+		}
 	}
 
 	protected function encodePayload(PacketSerializer $out) : void{
@@ -210,7 +214,9 @@ class AddPlayerPacket extends DataPacket implements ClientboundPacket{
 		}
 
 		$out->putString($this->deviceId);
-		$out->putLInt($this->buildPlatform);
+		if($out->getProtocolId() >= ProtocolInfo::PROTOCOL_1_16_0){
+			$out->putLInt($this->buildPlatform);
+		}
 	}
 
 	public function handle(PacketHandlerInterface $handler) : bool{

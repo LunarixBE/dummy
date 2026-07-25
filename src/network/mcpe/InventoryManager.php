@@ -709,6 +709,27 @@ class InventoryManager{
 	}
 
 	public function syncCreative() : void{
+		if($this->session->getProtocolId() === ProtocolInfo::PROTOCOL_1_12_0){
+			$typeConverter = $this->session->getTypeConverter();
+			$items = [];
+			if(!$this->player->isSpectator()){
+				foreach($this->player->getCreativeInventory()->getAllEntries() as $entry){
+					$item = $entry->getItem();
+					if($typeConverter->getItemTranslator()->isItemTypeNetworkCompatible($item)){
+						$items[] = ItemStackWrapper::legacy($typeConverter->coreItemStackToNet($item));
+					}
+				}
+			}
+			$this->session->sendDataPacket(InventoryContentPacket::create(
+				ContainerIds::CREATIVE,
+				$items,
+				new FullContainerName(ContainerIds::CREATIVE),
+				0,
+				ItemStackWrapper::legacy(ItemStack::null())
+			));
+			return;
+		}
+
 		$this->session->sendDataPacket(CreativeInventoryCache::getInstance($this->session->getProtocolId())->buildPacket($this->player->getCreativeInventory(), $this->session));
 	}
 
@@ -717,6 +738,10 @@ class InventoryManager{
 	 * @phpstan-param list<EnchantingOption> $options
 	 */
 	public function syncEnchantingTableOptions(array $options) : void{
+		if($this->session->getProtocolId() === ProtocolInfo::PROTOCOL_1_12_0){
+			return;
+		}
+
 		$protocolOptions = [];
 
 		foreach($options as $index => $option){

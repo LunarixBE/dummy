@@ -32,25 +32,25 @@ final class ClientData{
 	 * @var ClientDataAnimationFrame[]
 	 * @required
 	 */
-	public array $AnimatedImageData;
+	public array $AnimatedImageData = [];
 
 	/** @required */
-	public string $ArmSize;
+	public string $ArmSize = "wide";
 
 	/** @required */
-	public string $CapeData;
+	public string $CapeData = "";
 
 	/** @required */
-	public string $CapeId;
+	public string $CapeId = "";
 
 	/** @required */
-	public int $CapeImageHeight;
+	public int $CapeImageHeight = 0;
 
 	/** @required */
-	public int $CapeImageWidth;
+	public int $CapeImageWidth = 0;
 
 	/** @required */
-	public bool $CapeOnClassicSkin;
+	public bool $CapeOnClassicSkin = false;
 
 	/** @required */
 	public int $ClientRandomId;
@@ -59,24 +59,24 @@ final class ClientData{
 	public bool $CompatibleWithClientSideChunkGen;
 
 	/** @required */
-	public int $CurrentInputMode;
+	public int $CurrentInputMode = 0;
 
 	/** @required */
-	public int $DefaultInputMode;
+	public int $DefaultInputMode = 0;
 
 	/** @required */
-	public string $DeviceId;
+	public string $DeviceId = "";
 
 	/** @required */
-	public string $DeviceModel;
+	public string $DeviceModel = "";
 
 	/** @required */
-	public int $DeviceOS;
+	public int $DeviceOS = 0;
 
 	public bool $FilterProfanity;
 
 	/** @required */
-	public string $GameVersion;
+	public string $GameVersion = "1.12.0";
 
 	/** >= ProtocolInfo::PROTOCOL_1_21_70 */
 	public int $GraphicsMode;
@@ -94,7 +94,7 @@ final class ClientData{
 	public int $ClientEditorConnectionIntent;
 
 	/** @required */
-	public string $LanguageCode;
+	public string $LanguageCode = "en_US";
 
 	/** >= ProtocolInfo::PROTOCOL_1_21_40 */
 	public int $MaxViewDistance;
@@ -112,22 +112,22 @@ final class ClientData{
 	 * @var ClientDataPersonaSkinPiece[]
 	 * @required
 	 */
-	public array $PersonaPieces;
+	public array $PersonaPieces = [];
 
 	/** @required */
-	public bool $PersonaSkin;
+	public bool $PersonaSkin = false;
 
 	/**
 	 * @var ClientDataPersonaPieceTintColor[]
 	 * @required
 	 */
-	public array $PieceTintColors;
+	public array $PieceTintColors = [];
 
 	/** @required */
-	public string $PlatformOfflineId;
+	public string $PlatformOfflineId = "";
 
 	/** @required */
-	public string $PlatformOnlineId;
+	public string $PlatformOnlineId = "";
 
 	/** >= ProtocolInfo::PROTOCOL_1_21_40 */
 	public int $PlatformType;
@@ -141,47 +141,53 @@ final class ClientData{
 	public bool $PremiumSkin = false;
 
 	/** @required */
-	public string $SelfSignedId;
+	public string $SelfSignedId = "";
 
 	/** @required */
-	public string $ServerAddress;
+	public string $ServerAddress = "";
 
 	/** @required */
-	public string $SkinAnimationData;
+	public string $SkinAnimationData = "";
 
 	/** @required */
-	public string $SkinColor;
+	public string $SkinColor = "";
 
 	/** @required */
 	public string $SkinData;
 
 	/** @required */
-	public string $SkinGeometryData;
+	public string $SkinGeometryData = "";
 
 	/** >= PROTOCOL_1_17_30 */
 	public string $SkinGeometryDataEngineVersion;
 
 	/** @required */
-	public string $SkinId;
+	public string $SkinId = "Standard_Custom";
 
 	/** @required */
-	public int $SkinImageHeight;
+	public int $SkinImageHeight = 0;
 
 	/** @required */
-	public int $SkinImageWidth;
+	public int $SkinImageWidth = 0;
 
 	/** @required */
-	public string $SkinResourcePatch;
+	public string $SkinResourcePatch = "";
+
+	/** <= ProtocolInfo::PROTOCOL_1_12_0 */
+	public string $SkinGeometryName = "";
+
+	/** <= ProtocolInfo::PROTOCOL_1_12_0 */
+	public string $SkinGeometry = "";
 
 	/** @required */
-	public string $ThirdPartyName;
+	public string $ThirdPartyName = "";
 
 	/** <= ProtocolInfo::PROTOCOL_1_21_80 */
-	public bool $ThirdPartyNameOnly;
+	public bool $ThirdPartyNameOnly = false;
 
 	/** >= PROTOCOL_1_19_20 */
 	public bool $TrustedSkin;
 
 	/** @required */
-	public int $UIProfile;
+	public int $UIProfile = 0;
 }

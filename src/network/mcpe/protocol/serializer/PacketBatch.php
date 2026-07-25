@@ -72,7 +72,7 @@ class PacketBatch{
 	final public static function decodePackets(BinaryStream $stream, int $protocolId, PacketPool $packetPool) : \Generator{
 		$c = 0;
 		foreach(self::decodeRaw($stream) as $packetBuffer){
-			$packet = $packetPool->getPacket($packetBuffer);
+			$packet = $packetPool->getPacket($packetBuffer, $protocolId);
 			if($packet !== null){
 				try{
 					$packet->decode(PacketSerializer::decoder($protocolId, $packetBuffer, 0));

@@ -393,7 +393,7 @@ class LoginPacketHandler extends PacketHandler{
 
 		$mapper = new \JsonMapper();
 		$mapper->bEnforceMapType = false; //TODO: we don't really need this as an array, but right now we don't have enough models
-		$mapper->bExceptionOnMissingData = true;
+		$mapper->bExceptionOnMissingData = $this->session->getProtocolId() >= ProtocolInfo::PROTOCOL_1_16_0;
 		$mapper->bExceptionOnUndefinedProperty = false;
 		$mapper->bRemoveUndefinedAttributes = true;
 		$mapper->bStrictObjectTypeChecking = true;

@@ -48,7 +48,9 @@ class ContainerClosePacket extends DataPacket implements ClientboundPacket, Serv
 		if($in->getProtocolId() >= ProtocolInfo::PROTOCOL_1_21_0){
 			$this->windowType = $in->getByte();
 		}
-		$this->server = $in->getBool();
+		if($in->getProtocolId() >= ProtocolInfo::PROTOCOL_1_16_0){
+			$this->server = $in->getBool();
+		}
 	}
 
 	protected function encodePayload(PacketSerializer $out) : void{
@@ -56,7 +58,9 @@ class ContainerClosePacket extends DataPacket implements ClientboundPacket, Serv
 		if($out->getProtocolId() >= ProtocolInfo::PROTOCOL_1_21_0){
 			$out->putByte($this->windowType);
 		}
-		$out->putBool($this->server);
+		if($out->getProtocolId() >= ProtocolInfo::PROTOCOL_1_16_0){
+			$out->putBool($this->server);
+		}
 	}
 
 	public function handle(PacketHandlerInterface $handler) : bool{

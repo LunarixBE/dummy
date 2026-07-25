@@ -30,6 +30,8 @@ use pocketmine\network\mcpe\protocol\types\skin\SkinData;
 use pocketmine\network\mcpe\protocol\types\skin\SkinImage;
 use function array_map;
 use function base64_decode;
+use function json_encode;
+use const JSON_THROW_ON_ERROR;
 
 final class ClientDataToSkinDataHelper{
 
@@ -48,6 +50,23 @@ final class ClientDataToSkinDataHelper{
 	 * @throws \InvalidArgumentException
 	 */
 	public static function fromClientData(ClientData $clientData) : SkinData{
+		$skinBytes = self::safeB64Decode($clientData->SkinData, "SkinData");
+		$capeBytes = self::safeB64Decode($clientData->CapeData, "CapeData");
+		$resourcePatch = $clientData->SkinResourcePatch !== "" ?
+			self::safeB64Decode($clientData->SkinResourcePatch, "SkinResourcePatch") :
+			json_encode(["geometry" => ["default" => $clientData->SkinGeometryName !== "" ? $clientData->SkinGeometryName : "geometry.humanoid.custom"]], JSON_THROW_ON_ERROR);
+		$geometryData = $clientData->SkinGeometryData !== "" ?
+			self::safeB64Decode($clientData->SkinGeometryData, "SkinGeometryData") :
+			self::safeB64Decode($clientData->SkinGeometry, "SkinGeometry");
+		$skinImage = $clientData->SkinImageHeight > 0 && $clientData->SkinImageWidth > 0 ?
+			new SkinImage($clientData->SkinImageHeight, $clientData->SkinImageWidth, $skinBytes) :
+			SkinImage::fromLegacy($skinBytes);
+		$capeImage = $capeBytes !== "" ?
+			($clientData->CapeImageHeight > 0 && $clientData->CapeImageWidth > 0 ?
+				new SkinImage($clientData->CapeImageHeight, $clientData->CapeImageWidth, $capeBytes) :
+				SkinImage::fromLegacy($capeBytes)) :
+			new SkinImage(0, 0, "");
+
 		/** @var SkinAnimation[] $animations */
 		$animations = [];
 		foreach($clientData->AnimatedImageData as $k => $animation){
@@ -65,11 +84,11 @@ final class ClientDataToSkinDataHelper{
 		return new SkinData(
 			$clientData->SkinId,
 			$clientData->PlayFabId ?? "",
-			self::safeB64Decode($clientData->SkinResourcePatch, "SkinResourcePatch"),
-			new SkinImage($clientData->SkinImageHeight, $clientData->SkinImageWidth, self::safeB64Decode($clientData->SkinData, "SkinData")),
+			$resourcePatch,
+			$skinImage,
 			$animations,
-			new SkinImage($clientData->CapeImageHeight, $clientData->CapeImageWidth, self::safeB64Decode($clientData->CapeData, "CapeData")),
-			self::safeB64Decode($clientData->SkinGeometryData, "SkinGeometryData"),
+			$capeImage,
+			$geometryData,
 			self::safeB64Decode($clientData->SkinGeometryDataEngineVersion ?? "", "SkinGeometryDataEngineVersion"), //yes, they actually base64'd the version!
 			self::safeB64Decode($clientData->SkinAnimationData, "SkinAnimationData"),
 			$clientData->CapeId,

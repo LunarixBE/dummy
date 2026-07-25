@@ -2,19 +2,22 @@
 
 /*
  *
- *  ____            _        _   __  __ _                  __  __ ____
- * |  _ \ ___   ___| | _____| |_|  \/  (_)_ __   ___      |  \/  |  _ \
- * | |_) / _ \ / __| |/ / _ \ __| |\/| | | '_ \ / _ \_____| |\/| | |_) |
- * |  __/ (_) | (__|   <  __/ |_| |  | | | | | |  __/_____| |  | |  __/
- * |_|   \___/ \___|_|\_\___|\__|_|  |_|_|_| |_|\___|     |_|  |_|_|
+ *  _____                    _   _       _
+ * | ____|___ ___  ___ _ __ | |_(_) __ _| |
+ * |  _| / __/ __|/ _ \ '_ \| __| |/ _` | |
+ * | |___\__ \__ \  __/ | | | |_| | (_| | |
+ * |_____|___/___/\___|_| |_|\__|_|\__,_|_|
+ *
+ * Essential — PocketMine-MP Fork
+ * Supported MCPE/Bedrock versions: 1.12, 1.16 - 1.26.x
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
  *
- * @author PocketMine Team
- * @link http://www.pocketmine.net/
+ * @author Essential Team
+ * @link https://github.com/BakuTeam/Essential
  *
  *
  */
@@ -96,12 +99,14 @@ final class CraftingDataCache{
 		foreach($manager->getCraftingRecipeIndex() as $index => $recipe){
 			$recipeNetId = $index + self::RECIPE_ID_OFFSET;
 			if($recipe instanceof ShapelessRecipe){
-				$typeTag = match($recipe->getType()){
-					ShapelessRecipeType::CRAFTING => CraftingRecipeBlockName::CRAFTING_TABLE,
-					ShapelessRecipeType::STONECUTTER => CraftingRecipeBlockName::STONECUTTER,
-					ShapelessRecipeType::CARTOGRAPHY => CraftingRecipeBlockName::CARTOGRAPHY_TABLE,
-					ShapelessRecipeType::SMITHING => CraftingRecipeBlockName::SMITHING_TABLE,
-				};
+				$typeTag = $this->protocolId < ProtocolInfo::PROTOCOL_1_16_0 ?
+					CraftingRecipeBlockName::CRAFTING_TABLE :
+					match($recipe->getType()){
+						ShapelessRecipeType::CRAFTING => CraftingRecipeBlockName::CRAFTING_TABLE,
+						ShapelessRecipeType::STONECUTTER => CraftingRecipeBlockName::STONECUTTER,
+						ShapelessRecipeType::CARTOGRAPHY => CraftingRecipeBlockName::CARTOGRAPHY_TABLE,
+						ShapelessRecipeType::SMITHING => CraftingRecipeBlockName::SMITHING_TABLE,
+					};
 				foreach($itemTagDowngrader->downgradeShapelessRecipe($recipe) as $r){
 					try{
 						$recipesWithTypeIds[] = new ProtocolShapelessRecipe(
@@ -150,6 +155,9 @@ final class CraftingDataCache{
 		}
 
 		foreach(FurnaceType::cases() as $furnaceType){
+			if($this->protocolId < ProtocolInfo::PROTOCOL_1_16_0 && $furnaceType !== FurnaceType::FURNACE){
+				continue;
+			}
 			$typeTag = match($furnaceType){
 				FurnaceType::FURNACE => FurnaceRecipeBlockName::FURNACE,
 				FurnaceType::BLAST_FURNACE => FurnaceRecipeBlockName::BLAST_FURNACE,

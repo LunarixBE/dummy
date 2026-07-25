@@ -35,6 +35,7 @@ use pocketmine\network\mcpe\protocol\EmotePacket;
 use pocketmine\network\mcpe\protocol\MobArmorEquipmentPacket;
 use pocketmine\network\mcpe\protocol\MobEffectPacket;
 use pocketmine\network\mcpe\protocol\MobEquipmentPacket;
+use pocketmine\network\mcpe\protocol\ProtocolInfo;
 use pocketmine\network\mcpe\protocol\RemoveActorPacket;
 use pocketmine\network\mcpe\protocol\SetActorDataPacket;
 use pocketmine\network\mcpe\protocol\TakeItemActorPacket;
@@ -46,6 +47,7 @@ use pocketmine\network\mcpe\protocol\types\inventory\ItemStackWrapper;
 use pocketmine\network\mcpe\protocol\UpdateAttributesPacket;
 use function array_map;
 use function count;
+use function array_filter;
 use function ksort;
 use const SORT_NUMERIC;
 
@@ -165,6 +167,11 @@ final class StandardEntityEventBroadcaster implements EntityEventBroadcaster{
 	}
 
 	public function onEmote(array $recipients, Human $from, string $emoteId) : void{
+		$recipients = array_filter($recipients, static fn(NetworkSession $session) : bool => $session->getProtocolId() >= ProtocolInfo::PROTOCOL_1_16_0);
+		if(count($recipients) === 0){
+			return;
+		}
+
 		$this->sendDataPacket($recipients, EmotePacket::create(
 			$from->getId(),
 			$emoteId,

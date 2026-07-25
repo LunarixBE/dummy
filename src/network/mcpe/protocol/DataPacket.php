@@ -23,6 +23,7 @@ declare(strict_types=1);
 
 namespace pocketmine\network\mcpe\protocol;
 
+use pocketmine\network\mcpe\convert\PacketIdTranslator;
 use pocketmine\network\mcpe\protocol\serializer\PacketSerializer;
 use pocketmine\utils\BinaryDataException;
 use function get_class;
@@ -70,6 +71,19 @@ abstract class DataPacket implements Packet{
 	 */
 	protected function decodeHeader(PacketSerializer $in) : void{
 		$header = $in->getUnsignedVarInt();
+		if(PacketIdTranslator::isLegacyProtocol($in->getProtocolId())){
+			$pid = PacketIdTranslator::fromNetworkId($in->getProtocolId(), $header);
+			if($pid === null){
+				throw new PacketDecodeException("Unknown legacy packet ID $header");
+			}
+			if($pid !== static::NETWORK_ID){
+				throw new PacketDecodeException("Expected " . static::NETWORK_ID . " for packet ID, got $pid");
+			}
+			$this->senderSubId = 0;
+			$this->recipientSubId = 0;
+			return;
+		}
+
 		$pid = $header & self::PID_MASK;
 		if($pid !== static::NETWORK_ID){
 			//TODO: this means a logical error in the code, but how to prevent it from happening?
@@ -94,6 +108,11 @@ abstract class DataPacket implements Packet{
 	}
 
 	protected function encodeHeader(PacketSerializer $out) : void{
+		if(PacketIdTranslator::isLegacyProtocol($out->getProtocolId())){
+			$out->putUnsignedVarInt(PacketIdTranslator::toNetworkId($out->getProtocolId(), static::NETWORK_ID));
+			return;
+		}
+
 		$out->putUnsignedVarInt(
 			static::NETWORK_ID |
 			($this->senderSubId << self::SENDER_SUBCLIENT_ID_SHIFT) |

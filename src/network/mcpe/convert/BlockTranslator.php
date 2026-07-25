@@ -2,19 +2,22 @@
 
 /*
  *
- *  ____            _        _   __  __ _                  __  __ ____
- * |  _ \ ___   ___| | _____| |_|  \/  (_)_ __   ___      |  \/  |  _ \
- * | |_) / _ \ / __| |/ / _ \ __| |\/| | | '_ \ / _ \_____| |\/| | |_) |
- * |  __/ (_) | (__|   <  __/ |_| |  | | | | | |  __/_____| |  | |  __/
- * |_|   \___/ \___|_|\_\___|\__|_|  |_|_|_| |_|\___|     |_|  |_|_|
+ *  _____                    _   _       _
+ * | ____|___ ___  ___ _ __ | |_(_) __ _| |
+ * |  _| / __/ __|/ _ \ '_ \| __| |/ _` | |
+ * | |___\__ \__ \  __/ | | | |_| | (_| | |
+ * |_____|___/___/\___|_| |_|\__|_|\__,_|_|
+ *
+ * Essential — PocketMine-MP Fork
+ * Supported MCPE/Bedrock versions: 1.12, 1.16 - 1.26.x
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
  *
- * @author PocketMine Team
- * @link http://www.pocketmine.net/
+ * @author Essential Team
+ * @link https://github.com/BakuTeam/Essential
  *
  *
  */
@@ -249,7 +252,11 @@ final class BlockTranslator{
 			self::BLOCK_STATE_META_MAP_PATH => '-1.19.10',
 		],
 		ProtocolInfo::PROTOCOL_1_16_0 => [
-			self::CANONICAL_BLOCK_STATES_PATH => '-1.16.0',
+			self::CANONICAL_BLOCK_STATES_PATH => '-1.16.20',
+			self::BLOCK_STATE_META_MAP_PATH => '-1.19.10',
+		],
+		ProtocolInfo::PROTOCOL_1_12_0 => [
+			self::CANONICAL_BLOCK_STATES_PATH => '-1.16.20',
 			self::BLOCK_STATE_META_MAP_PATH => '-1.19.10',
 		],
 	];
@@ -259,6 +266,16 @@ final class BlockTranslator{
 	 * @phpstan-var array<int, int>
 	 */
 	private array $networkIdCache = [];
+	/**
+	 * @var int[]
+	 * @phpstan-var array<int, int>
+	 */
+	private array $dictionaryStateIdCache = [];
+	/**
+	 * @var int[]
+	 * @phpstan-var array<int, int>
+	 */
+	private array $legacyR12FullIdCache = [];
 
 	/** Used when a blockstate can't be correctly serialized (e.g. because it's unknown) */
 	private BlockStateData $fallbackStateData;
@@ -282,21 +299,23 @@ final class BlockTranslator{
 		return new self(
 			BlockStateDictionary::loadFromString($canonicalBlockStatesRaw, $metaMappingRaw, $isHash, $isHash ? self::$HASH_PROTOCOLS[$protocolId] : null),
 			GlobalBlockStateHandlers::getSerializer(),
+			$protocolId
 		);
 	}
 
 	public function __construct(
 		private BlockStateDictionary $blockStateDictionary,
-		private BlockStateSerializer $blockStateSerializer
+		private BlockStateSerializer $blockStateSerializer,
+		private int $protocolId = ProtocolInfo::CURRENT_PROTOCOL
 	){
 		$this->fallbackStateData = BlockStateData::current(BlockTypeNames::DIRT, []);
 		$this->fallbackStateId = $this->blockStateDictionary->lookupStateIdFromData($this->fallbackStateData) ??
 			throw new AssumptionFailedError(BlockTypeNames::DIRT . " should always exist");
 	}
 
-	public function internalIdToNetworkId(int $internalStateId) : int{
-		if(isset($this->networkIdCache[$internalStateId])){
-			return $this->networkIdCache[$internalStateId];
+	private function internalIdToDictionaryStateId(int $internalStateId) : int{
+		if(isset($this->dictionaryStateIdCache[$internalStateId])){
+			return $this->dictionaryStateIdCache[$internalStateId];
 		}
 
 		try{
@@ -312,7 +331,49 @@ final class BlockTranslator{
 			$networkId = $this->fallbackStateId;
 		}
 
+		return $this->dictionaryStateIdCache[$internalStateId] = $networkId;
+	}
+
+	public function internalIdToLegacyR12FullId(int $internalStateId) : int{
+		if(isset($this->legacyR12FullIdCache[$internalStateId])){
+			return $this->legacyR12FullIdCache[$internalStateId];
+		}
+
+		$networkId = $this->internalIdToDictionaryStateId($internalStateId);
+		$stateData = $this->blockStateDictionary->generateDataFromStateId($networkId);
+		$meta = $this->blockStateDictionary->getMetaFromStateId($networkId);
+		if($stateData === null || $meta === null){
+			$legacyFullId = LegacyProtocolData::legacyFullIdFromNameMeta(BlockTypeNames::DIRT, 0);
+		}else{
+			$legacyFullId = LegacyProtocolData::legacyFullIdFromNameMeta($stateData->getName(), $meta);
+		}
+
+		return $this->legacyR12FullIdCache[$internalStateId] = $legacyFullId;
+	}
+
+	public function internalIdToNetworkId(int $internalStateId) : int{
+		if(isset($this->networkIdCache[$internalStateId])){
+			return $this->networkIdCache[$internalStateId];
+		}
+
+		$networkId = $this->protocolId === ProtocolInfo::PROTOCOL_1_12_0 ?
+			LegacyProtocolData::runtimeIdFromLegacyFullId($this->internalIdToLegacyR12FullId($internalStateId)) :
+			$this->internalIdToDictionaryStateId($internalStateId);
+
 		return $this->networkIdCache[$internalStateId] = $networkId;
+	}
+
+	public function networkStateDataToNetworkId(BlockStateData $stateData) : ?int{
+		$dictionaryStateId = $this->blockStateDictionary->lookupStateIdFromData($stateData);
+		if($dictionaryStateId === null){
+			return null;
+		}
+		if($this->protocolId !== ProtocolInfo::PROTOCOL_1_12_0){
+			return $dictionaryStateId;
+		}
+
+		$meta = $this->blockStateDictionary->getMetaFromStateId($dictionaryStateId);
+		return $meta !== null ? LegacyProtocolData::runtimeIdFromLegacyFullId(LegacyProtocolData::legacyFullIdFromNameMeta($stateData->getName(), $meta)) : null;
 	}
 
 	public function networkIdsAreHashes() : bool{
@@ -326,7 +387,7 @@ final class BlockTranslator{
 		//we don't directly use the blockstate serializer here - we can't assume that the network blockstate NBT is the
 		//same as the disk blockstate NBT, in case we decide to have different world version than network version (or in
 		//case someone wants to implement multi version).
-		$networkRuntimeId = $this->internalIdToNetworkId($internalStateId);
+		$networkRuntimeId = $this->internalIdToDictionaryStateId($internalStateId);
 
 		return $this->blockStateDictionary->generateDataFromStateId($networkRuntimeId) ?? throw new AssumptionFailedError("We just looked up this state ID, so it must exist");
 	}
@@ -338,7 +399,7 @@ final class BlockTranslator{
 		//we don't directly use the blockstate serializer here - we can't assume that the network blockstate NBT is the
 		//same as the disk blockstate NBT, in case we decide to have different world version than network version (or in
 		//case someone wants to implement multi version).
-		$networkRuntimeId = $this->internalIdToNetworkId($internalStateId);
+		$networkRuntimeId = $this->internalIdToDictionaryStateId($internalStateId);
 
 		return $this->blockStateDictionary->generateCurrentDataFromStateId($networkRuntimeId) ?? throw new AssumptionFailedError("We just looked up this state ID, so it must exist");
 	}

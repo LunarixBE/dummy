@@ -28,6 +28,7 @@ use pocketmine\data\bedrock\BiomeIds;
 use pocketmine\data\bedrock\LegacyBiomeIdToStringIdMap;
 use pocketmine\nbt\TreeRoot;
 use pocketmine\network\mcpe\convert\BlockTranslator;
+use pocketmine\network\mcpe\convert\LegacyProtocolData;
 use pocketmine\network\mcpe\convert\TypeConverter;
 use pocketmine\network\mcpe\protocol\ProtocolInfo;
 use pocketmine\network\mcpe\protocol\serializer\NetworkNbtSerializer;
@@ -41,6 +42,7 @@ use pocketmine\world\format\SubChunk;
 use function chr;
 use function count;
 use function min;
+use function ord;
 use function str_repeat;
 
 final class ChunkSerializer{
@@ -95,6 +97,22 @@ final class ChunkSerializer{
 		// }
 
 		// return 0;
+	}
+
+	/**
+	 * Returns the number of legacy 0-255Y subchunks written for Bedrock 1.12.x.
+	 *
+	 * @phpstan-param DimensionIds::* $dimensionId
+	 */
+	public static function getLegacyR12SubChunkCount(Chunk $chunk, int $dimensionId) : int{
+		$maxSubChunkIndex = $dimensionId === DimensionIds::NETHER ? 7 : 15;
+		for($y = $maxSubChunkIndex; $y >= 0; --$y){
+			if(!$chunk->getSubChunk($y)->isEmptyFast()){
+				return $y + 1;
+			}
+		}
+
+		return 0;
 	}
 
 	/**
@@ -167,6 +185,10 @@ final class ChunkSerializer{
 	 * @phpstan-param DimensionIds::* $dimensionId
 	 */
 	public static function serializeFullChunk(Chunk $chunk, int $dimensionId, TypeConverter $typeConverter, ?string $tiles = null) : string{
+		if($typeConverter->getProtocolId() === ProtocolInfo::PROTOCOL_1_12_0){
+			return self::serializeLegacyR12FullChunk($chunk, $dimensionId, $typeConverter, $tiles);
+		}
+
 		$stream = PacketSerializer::encoder($typeConverter->getProtocolId());
 
 		// foreach(self::serializeSubChunks($chunk, $dimensionId, $typeConverter) as $subChunk){
@@ -211,6 +233,76 @@ final class ChunkSerializer{
 			}
 		}
 		return $stream->getBuffer();
+	}
+
+	/**
+	 * @phpstan-param DimensionIds::* $dimensionId
+	 */
+	private static function serializeLegacyR12FullChunk(Chunk $chunk, int $dimensionId, TypeConverter $typeConverter, ?string $tiles) : string{
+		$stream = PacketSerializer::encoder($typeConverter->getProtocolId());
+		$subChunkCount = self::getLegacyR12SubChunkCount($chunk, $dimensionId);
+		$blockTranslator = $typeConverter->getBlockTranslator();
+
+		for($y = 0; $y < $subChunkCount; ++$y){
+			self::serializeLegacyR12SubChunk($chunk->getSubChunk($y), $blockTranslator, $stream);
+		}
+
+		$biome = str_repeat(chr(BiomeIds::OCEAN), 256);
+		for($x = 0; $x < 16; ++$x){
+			for($z = 0; $z < 16; ++$z){
+				$height = $chunk->getHighestBlockAt($x, $z) ?? 0;
+				$biomeId = $chunk->getBiomeId($x, $height, $z);
+				if($biomeId < 0 || $biomeId > 255){
+					$biomeId = BiomeIds::OCEAN;
+				}
+				$biome[($z << 4) | $x] = chr($biomeId);
+			}
+		}
+		$stream->put($biome);
+		$stream->putByte(0); //border block array count
+
+		if($tiles !== null){
+			$stream->put($tiles);
+		}else{
+			$stream->put(self::serializeTiles($chunk, $typeConverter));
+		}
+
+		return $stream->getBuffer();
+	}
+
+	private static function serializeLegacyR12SubChunk(\pocketmine\world\format\SubChunk $subChunk, BlockTranslator $blockTranslator, PacketSerializer $stream) : void{
+		$stream->putByte(0); //storage version
+
+		$idArray = str_repeat("\x00", 4096);
+		$metaArray = str_repeat("\x00", 2048);
+		$fallbackFullId = LegacyProtocolData::legacyFullIdFromNameMeta("minecraft:info_update", 0);
+
+		if(!$subChunk->isEmptyFast()){
+			for($x = 0; $x < 16; ++$x){
+				for($z = 0; $z < 16; ++$z){
+					for($y = 0; $y < 16; ++$y){
+						$fullState = $blockTranslator->internalIdToLegacyR12FullId($subChunk->getBlockStateId($x, $y, $z));
+						$legacyId = $fullState >> 4;
+						$legacyMeta = $fullState & 0x0f;
+						if($legacyId > 255){
+							$legacyId = $fallbackFullId >> 4;
+							$legacyMeta = $fallbackFullId & 0x0f;
+						}
+
+						$idArray[($x << 8) | ($z << 4) | $y] = chr($legacyId);
+						$metaIndex = ($x << 7) | ($z << 3) | ($y >> 1);
+						if(($y & 1) === 0){
+							$metaArray[$metaIndex] = chr((ord($metaArray[$metaIndex]) & 0xf0) | $legacyMeta);
+						}else{
+							$metaArray[$metaIndex] = chr(($legacyMeta << 4) | (ord($metaArray[$metaIndex]) & 0x0f));
+						}
+					}
+				}
+			}
+		}
+
+		$stream->put($idArray);
+		$stream->put($metaArray);
 	}
 
 	/**

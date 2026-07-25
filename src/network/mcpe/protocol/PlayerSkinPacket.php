@@ -25,7 +25,12 @@ namespace pocketmine\network\mcpe\protocol;
 
 use pocketmine\network\mcpe\protocol\serializer\PacketSerializer;
 use pocketmine\network\mcpe\protocol\types\skin\SkinData;
+use pocketmine\network\mcpe\protocol\types\skin\SkinImage;
 use Ramsey\Uuid\UuidInterface;
+use function is_array;
+use function is_string;
+use function json_decode;
+use function json_encode;
 
 class PlayerSkinPacket extends DataPacket implements ClientboundPacket, ServerboundPacket{
 	public const NETWORK_ID = ProtocolInfo::PLAYER_SKIN_PACKET;
@@ -49,6 +54,26 @@ class PlayerSkinPacket extends DataPacket implements ClientboundPacket, Serverbo
 
 	protected function decodePayload(PacketSerializer $in) : void{
 		$this->uuid = $in->getUUID();
+		if($in->getProtocolId() < ProtocolInfo::PROTOCOL_1_16_0){
+			$skinId = $in->getString();
+			$this->newSkinName = $in->getString();
+			$this->oldSkinName = $in->getString();
+			$skinData = $in->getString();
+			$capeData = $in->getString();
+			$geometryName = $in->getString();
+			$geometryData = $in->getString();
+			$this->skin = new SkinData(
+				$skinId,
+				"",
+				self::resourcePatchFromLegacyGeometryName($geometryName),
+				SkinImage::fromLegacy($skinData),
+				[],
+				$capeData !== "" ? SkinImage::fromLegacy($capeData) : new SkinImage(0, 0, ""),
+				$geometryData,
+				premium: $in->getBool()
+			);
+			return;
+		}
 		$this->skin = $in->getSkin();
 		$this->newSkinName = $in->getString();
 		$this->oldSkinName = $in->getString();
@@ -57,10 +82,37 @@ class PlayerSkinPacket extends DataPacket implements ClientboundPacket, Serverbo
 
 	protected function encodePayload(PacketSerializer $out) : void{
 		$out->putUUID($this->uuid);
+		if($out->getProtocolId() < ProtocolInfo::PROTOCOL_1_16_0){
+			$out->putString($this->skin->getSkinId());
+			$out->putString($this->newSkinName);
+			$out->putString($this->oldSkinName);
+			$out->putString($this->skin->getSkinImage()->getData());
+			$out->putString($this->skin->getCapeImage()->getData());
+			$out->putString(self::legacyGeometryNameFromResourcePatch($this->skin->getResourcePatch()));
+			$out->putString($this->skin->getGeometryData());
+			$out->putBool($this->skin->isPremium());
+			return;
+		}
 		$out->putSkin($this->skin);
 		$out->putString($this->newSkinName);
 		$out->putString($this->oldSkinName);
 		$out->putBool($this->skin->isVerified());
+	}
+
+	private static function legacyGeometryNameFromResourcePatch(string $resourcePatch) : string{
+		$decoded = json_decode($resourcePatch, true);
+		if(is_array($decoded) && isset($decoded["geometry"]["default"]) && is_string($decoded["geometry"]["default"])){
+			return $decoded["geometry"]["default"];
+		}
+		return "geometry.humanoid.custom";
+	}
+
+	private static function resourcePatchFromLegacyGeometryName(string $geometryName) : string{
+		return (string) json_encode([
+			"geometry" => [
+				"default" => $geometryName !== "" ? $geometryName : "geometry.humanoid.custom"
+			]
+		]);
 	}
 
 	public function handle(PacketHandlerInterface $handler) : bool{

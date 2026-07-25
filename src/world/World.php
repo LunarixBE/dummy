@@ -77,6 +77,7 @@ use pocketmine\network\mcpe\convert\TypeConverter;
 use pocketmine\network\mcpe\NetworkBroadcastUtils;
 use pocketmine\network\mcpe\protocol\BlockActorDataPacket;
 use pocketmine\network\mcpe\protocol\ClientboundPacket;
+use pocketmine\network\mcpe\protocol\ProtocolInfo;
 use pocketmine\network\mcpe\protocol\types\BlockPosition;
 use pocketmine\network\mcpe\protocol\types\UpdateSubChunkBlocksPacketEntry;
 use pocketmine\network\mcpe\protocol\UpdateBlockPacket;
@@ -1229,7 +1230,7 @@ class World implements ChunkManager{
 					);
 					$packets[] = UpdateBlockPacket::create(
 						$blockPosition,
-						$blockTranslator->getBlockStateDictionary()->lookupStateIdFromData($fakeStateData) ?? throw new AssumptionFailedError("Unmapped fake blockstate data: " . $fakeStateData->toNbt()),
+						$blockTranslator->networkStateDataToNetworkId($fakeStateData) ?? throw new AssumptionFailedError("Unmapped fake blockstate data: " . $fakeStateData->toNbt()),
 						UpdateBlockPacket::FLAG_NETWORK,
 						UpdateBlockPacket::DATA_LAYER_NORMAL
 					);
@@ -1258,6 +1259,10 @@ class World implements ChunkManager{
 	 * @phpstan-return list<ClientboundPacket>
 	 */
 	public function createUpdateSubChunkBlocksPackets(TypeConverter $typeConverter, array $blocks) : array {
+		if($typeConverter->getProtocolId() < ProtocolInfo::PROTOCOL_1_16_0){
+			return $this->createBlockUpdatePackets($typeConverter, $blocks);
+		}
+
 		$blockTranslator = $typeConverter->getBlockTranslator();
 		$entries = [];
 		foreach($blocks as $block) {
@@ -1283,7 +1288,7 @@ class World implements ChunkManager{
 						array_merge($originalStateData->getStates(), $fakeStateProperties),
 						$originalStateData->getVersion()
 					);
-					$entries[] = UpdateSubChunkBlocksPacketEntry::simple($blockPosition, $blockTranslator->getBlockStateDictionary()->lookupStateIdFromData($fakeStateData) ?? throw new AssumptionFailedError("Unmapped fake blockstate data: " . $fakeStateData->toNbt()));
+					$entries[] = UpdateSubChunkBlocksPacketEntry::simple($blockPosition, $blockTranslator->networkStateDataToNetworkId($fakeStateData) ?? throw new AssumptionFailedError("Unmapped fake blockstate data: " . $fakeStateData->toNbt()));
 				}
 			}
 			$entries[] = UpdateSubChunkBlocksPacketEntry::simple($blockPosition, $blockTranslator->internalIdToNetworkId($blockStateId));

@@ -105,7 +105,7 @@ final class ShapelessRecipe extends RecipeWithTypeId{
 			$unlockingRequirement = RecipeUnlockingRequirement::read($in);
 		}
 
-		$recipeNetId = $in->readRecipeNetId();
+		$recipeNetId = $in->getProtocolId() >= ProtocolInfo::PROTOCOL_1_16_0 ? $in->readRecipeNetId() : 0;
 
 		return new self($recipeType, $recipeId, $input, $output, $uuid, $block, $priority, $unlockingRequirement ?? new RecipeUnlockingRequirement(null), $recipeNetId);
 	}
@@ -129,6 +129,8 @@ final class ShapelessRecipe extends RecipeWithTypeId{
 			$this->unlockingRequirement->write($out);
 		}
 
-		$out->writeRecipeNetId($this->recipeNetId);
+		if($out->getProtocolId() >= ProtocolInfo::PROTOCOL_1_16_0){
+			$out->writeRecipeNetId($this->recipeNetId);
+		}
 	}
 }

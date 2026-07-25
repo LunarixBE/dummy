@@ -70,6 +70,13 @@ class ResourcePackStackPacket extends DataPacket implements ClientboundPacket{
 			$this->resourcePackStack[] = ResourcePackStackEntry::read($in);
 		}
 
+		if($in->getProtocolId() === ProtocolInfo::PROTOCOL_1_12_0){
+			$this->experiments = new Experiments([], $in->getBool());
+			$this->baseGameVersion = "1.12.0";
+			$this->useVanillaEditorPacks = false;
+			return;
+		}
+
 		$this->baseGameVersion = $in->getString();
 		$this->experiments = Experiments::read($in);
 		if($in->getProtocolId() >= ProtocolInfo::PROTOCOL_1_20_80){
@@ -90,6 +97,11 @@ class ResourcePackStackPacket extends DataPacket implements ClientboundPacket{
 		$out->putUnsignedVarInt(count($this->resourcePackStack));
 		foreach($this->resourcePackStack as $entry){
 			$entry->write($out);
+		}
+
+		if($out->getProtocolId() === ProtocolInfo::PROTOCOL_1_12_0){
+			$out->putBool($this->experiments->hasPreviouslyUsedExperiments() || count($this->experiments->getExperiments()) > 0);
+			return;
 		}
 
 		$out->putString($this->baseGameVersion);

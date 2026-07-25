@@ -52,7 +52,7 @@ class InteractPacket extends DataPacket implements ServerboundPacket{
 				$this->y = $this->position->y;
 				$this->z = $this->position->z;
 			}
-		}elseif($this->action === self::ACTION_MOUSEOVER || $this->action === self::ACTION_LEAVE_VEHICLE){
+		}elseif($this->action === self::ACTION_MOUSEOVER || ($in->getProtocolId() >= ProtocolInfo::PROTOCOL_1_16_0 && $this->action === self::ACTION_LEAVE_VEHICLE)){
 			$this->x = $in->getLFloat();
 			$this->y = $in->getLFloat();
 			$this->z = $in->getLFloat();
@@ -67,7 +67,7 @@ class InteractPacket extends DataPacket implements ServerboundPacket{
 		if($out->getProtocolId() >= ProtocolInfo::PROTOCOL_1_21_130){
 			$position = $this->position ?? (isset($this->x, $this->y, $this->z) ? new Vector3($this->x, $this->y, $this->z) : null);
 			$out->writeOptional($position, fn(Vector3 $v) => $out->putVector3($v));
-		}elseif($this->action === self::ACTION_MOUSEOVER || $this->action === self::ACTION_LEAVE_VEHICLE){
+		}elseif($this->action === self::ACTION_MOUSEOVER || ($out->getProtocolId() >= ProtocolInfo::PROTOCOL_1_16_0 && $this->action === self::ACTION_LEAVE_VEHICLE)){
 			$out->putLFloat($this->x);
 			$out->putLFloat($this->y);
 			$out->putLFloat($this->z);

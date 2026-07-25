@@ -65,7 +65,7 @@ class AnimatePacket extends DataPacket implements ClientboundPacket, Serverbound
 		$this->action = $in->getProtocolId() >= ProtocolInfo::PROTOCOL_1_21_130 ? $in->getByte() : $in->getVarInt();
 		$this->actorRuntimeId = $in->getActorRuntimeId();
 
-		if($in->getProtocolId() >= ProtocolInfo::PROTOCOL_1_21_120 || ($this->action === self::ACTION_ROW_LEFT || $this->action === self::ACTION_ROW_RIGHT)){
+		if($in->getProtocolId() >= ProtocolInfo::PROTOCOL_1_21_120 || ($in->getProtocolId() < ProtocolInfo::PROTOCOL_1_16_0 ? (($this->action & 0x80) !== 0) : ($this->action === self::ACTION_ROW_LEFT || $this->action === self::ACTION_ROW_RIGHT))){
 			$this->data = $in->getLFloat();
 		}
 
@@ -82,7 +82,7 @@ class AnimatePacket extends DataPacket implements ClientboundPacket, Serverbound
 		}
 		$out->putActorRuntimeId($this->actorRuntimeId);
 
-		if($out->getProtocolId() >= ProtocolInfo::PROTOCOL_1_21_120 || ($this->action === self::ACTION_ROW_LEFT || $this->action === self::ACTION_ROW_RIGHT)){
+		if($out->getProtocolId() >= ProtocolInfo::PROTOCOL_1_21_120 || ($out->getProtocolId() < ProtocolInfo::PROTOCOL_1_16_0 ? (($this->action & 0x80) !== 0) : ($this->action === self::ACTION_ROW_LEFT || $this->action === self::ACTION_ROW_RIGHT))){
 			$out->putLFloat($this->data);
 		}
 

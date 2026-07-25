@@ -148,6 +148,9 @@ class TextPacket extends DataPacket implements ClientboundPacket, ServerboundPac
 			}
 		} else {
 			$this->type = $in->getByte();
+			if($in->getProtocolId() < ProtocolInfo::PROTOCOL_1_16_0 && $this->type === 9){
+				$this->type = self::TYPE_JSON;
+			}
 			$this->needsTranslation = $in->getBool();
 			switch($this->type){
 				case self::TYPE_CHAT:
@@ -187,7 +190,7 @@ class TextPacket extends DataPacket implements ClientboundPacket, ServerboundPac
 
 	protected function encodePayload(PacketSerializer $out) : void{
 		if ($out->getProtocolId() < ProtocolInfo::PROTOCOL_1_21_130) {
-			$out->putByte($this->type);
+			$out->putByte($out->getProtocolId() < ProtocolInfo::PROTOCOL_1_16_0 && ($this->type === self::TYPE_JSON || $this->type === self::TYPE_JSON_WHISPER || $this->type === self::TYPE_JSON_ANNOUNCEMENT) ? 9 : $this->type);
 		}
 		$out->putBool($this->needsTranslation);
 		switch($this->type){

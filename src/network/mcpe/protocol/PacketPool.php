@@ -23,6 +23,7 @@ declare(strict_types=1);
 
 namespace pocketmine\network\mcpe\protocol;
 
+use pocketmine\network\mcpe\convert\PacketIdTranslator;
 use pocketmine\utils\Binary;
 use pocketmine\utils\BinaryDataException;
 
@@ -296,8 +297,13 @@ class PacketPool{
 	/**
 	 * @throws BinaryDataException
 	 */
-	public function getPacket(string $buffer) : ?Packet{
+	public function getPacket(string $buffer, int $protocolId = ProtocolInfo::CURRENT_PROTOCOL) : ?Packet{
 		$offset = 0;
-		return $this->getPacketById(Binary::readUnsignedVarInt($buffer, $offset) & DataPacket::PID_MASK);
+		$header = Binary::readUnsignedVarInt($buffer, $offset);
+		$pid = PacketIdTranslator::isLegacyProtocol($protocolId) ?
+			PacketIdTranslator::fromNetworkId($protocolId, $header) :
+			($header & DataPacket::PID_MASK);
+
+		return $pid !== null ? $this->getPacketById($pid) : null;
 	}
 }

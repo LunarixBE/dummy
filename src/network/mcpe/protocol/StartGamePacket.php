@@ -27,16 +27,23 @@ use pocketmine\math\Vector3;
 use pocketmine\nbt\tag\CompoundTag;
 use pocketmine\nbt\tag\ListTag;
 use pocketmine\nbt\TreeRoot;
+use pocketmine\network\mcpe\convert\LegacyProtocolData;
 use pocketmine\network\mcpe\protocol\serializer\NetworkNbtSerializer;
 use pocketmine\network\mcpe\protocol\serializer\PacketSerializer;
+use pocketmine\network\mcpe\protocol\types\BlockPosition;
 use pocketmine\network\mcpe\protocol\types\BlockPaletteEntry;
 use pocketmine\network\mcpe\protocol\types\CacheableNbt;
+use pocketmine\network\mcpe\protocol\types\DimensionIds;
+use pocketmine\network\mcpe\protocol\types\Experiments;
 use pocketmine\network\mcpe\protocol\types\ItemTypeEntry;
 use pocketmine\network\mcpe\protocol\types\LevelSettings;
 use pocketmine\network\mcpe\protocol\types\NetworkPermissions;
 use pocketmine\network\mcpe\protocol\types\PlayerMovementSettings;
+use pocketmine\network\mcpe\protocol\types\ServerAuthMovementMode;
 use pocketmine\network\mcpe\protocol\types\ServerJoinInformation;
 use pocketmine\network\mcpe\protocol\types\ServerTelemetryData;
+use pocketmine\network\mcpe\protocol\types\SpawnSettings;
+use Ramsey\Uuid\Uuid;
 use Ramsey\Uuid\UuidInterface;
 use function count;
 
@@ -165,6 +172,11 @@ class StartGamePacket extends DataPacket implements ClientboundPacket{
 	protected function decodePayload(PacketSerializer $in) : void{
 		$this->serverTelemetryData = new ServerTelemetryData("", "", "", "");
 
+		if($in->getProtocolId() === ProtocolInfo::PROTOCOL_1_12_0){
+			$this->decodeLegacyR12Payload($in);
+			return;
+		}
+
 		$this->actorUniqueId = $in->getActorUniqueId();
 		$this->actorRuntimeId = $in->getActorRuntimeId();
 		$this->playerGamemode = $in->getVarInt();
@@ -241,6 +253,11 @@ class StartGamePacket extends DataPacket implements ClientboundPacket{
 	}
 
 	protected function encodePayload(PacketSerializer $out) : void{
+		if($out->getProtocolId() === ProtocolInfo::PROTOCOL_1_12_0){
+			$this->encodeLegacyR12Payload($out);
+			return;
+		}
+
 		$out->putActorUniqueId($this->actorUniqueId);
 		$out->putActorRuntimeId($this->actorRuntimeId);
 		$out->putVarInt($this->playerGamemode);
@@ -313,6 +330,136 @@ class StartGamePacket extends DataPacket implements ClientboundPacket{
 			$out->writeOptional($this->serverJoinInformation, fn(ServerJoinInformation $info) => $info->write($out, $out->getProtocolId()));
 			$this->serverTelemetryData->write($out);
 		}
+	}
+
+	private function decodeLegacyR12Payload(PacketSerializer $in) : void{
+		$this->actorUniqueId = $in->getActorUniqueId();
+		$this->actorRuntimeId = $in->getActorRuntimeId();
+		$this->playerGamemode = $in->getVarInt();
+		$this->playerPosition = $in->getVector3();
+		$this->pitch = $in->getLFloat();
+		$this->yaw = $in->getLFloat();
+
+		$levelSettings = new LevelSettings();
+		$levelSettings->seed = $in->getVarInt();
+		$dimension = $in->getVarInt();
+		$levelSettings->spawnSettings = new SpawnSettings(SpawnSettings::BIOME_TYPE_DEFAULT, "", $dimension);
+		$levelSettings->generator = $in->getVarInt();
+		$levelSettings->worldGamemode = $in->getVarInt();
+		$levelSettings->difficulty = $in->getVarInt();
+		$levelSettings->spawnPosition = $in->getBlockPosition();
+		$levelSettings->hasAchievementsDisabled = $in->getBool();
+		$levelSettings->time = $in->getVarInt();
+		$levelSettings->eduEditionOffer = $in->getBool() ? 1 : 0;
+		$levelSettings->hasEduFeaturesEnabled = $in->getBool();
+		$levelSettings->rainLevel = $in->getLFloat();
+		$levelSettings->lightningLevel = $in->getLFloat();
+		$levelSettings->hasConfirmedPlatformLockedContent = $in->getBool();
+		$levelSettings->isMultiplayerGame = $in->getBool();
+		$levelSettings->hasLANBroadcast = $in->getBool();
+		$levelSettings->xboxLiveBroadcastMode = $in->getVarInt();
+		$levelSettings->platformBroadcastMode = $in->getVarInt();
+		$levelSettings->commandsEnabled = $in->getBool();
+		$levelSettings->isTexturePacksRequired = $in->getBool();
+		$levelSettings->gameRules = $in->getGameRules(true);
+		$levelSettings->hasBonusChestEnabled = $in->getBool();
+		$levelSettings->hasStartWithMapEnabled = $in->getBool();
+		$levelSettings->defaultPlayerPermission = $in->getVarInt();
+		$levelSettings->serverChunkTickRadius = $in->getLInt();
+		$levelSettings->hasLockedBehaviorPack = $in->getBool();
+		$levelSettings->hasLockedResourcePack = $in->getBool();
+		$levelSettings->isFromLockedWorldTemplate = $in->getBool();
+		$levelSettings->useMsaGamertagsOnly = $in->getBool();
+		$levelSettings->isFromWorldTemplate = $in->getBool();
+		$levelSettings->isWorldTemplateOptionLocked = $in->getBool();
+		$levelSettings->onlySpawnV1Villagers = $in->getBool();
+		$levelSettings->experiments = new Experiments([], false);
+		$this->levelSettings = $levelSettings;
+
+		$this->levelId = $in->getString();
+		$this->worldName = $in->getString();
+		$this->premiumWorldTemplateId = $in->getString();
+		$this->isTrial = $in->getBool();
+		$this->playerMovementSettings = new PlayerMovementSettings(ServerAuthMovementMode::SERVER_AUTHORITATIVE_V2, 0, false);
+		$this->currentTick = $in->getLLong();
+		$this->enchantmentSeed = $in->getVarInt();
+
+		$this->blockPalette = [];
+		for($i = 0, $len = $in->getUnsignedVarInt(); $i < $len; ++$i){
+			$in->getString();
+			$in->getSignedLShort();
+			$in->getSignedLShort();
+		}
+
+		$this->itemTable = [];
+		for($i = 0, $count = $in->getUnsignedVarInt(); $i < $count; ++$i){
+			$stringId = $in->getString();
+			$numericId = $in->getSignedLShort();
+			$this->itemTable[] = new ItemTypeEntry($stringId, $numericId, false, -1, new CacheableNbt(new CompoundTag()));
+		}
+
+		$this->multiplayerCorrelationId = $in->getString();
+		$this->enableNewInventorySystem = false;
+		$this->serverSoftwareVersion = "";
+		$this->worldTemplateId = Uuid::fromString(Uuid::NIL);
+		$this->enableClientSideChunkGeneration = false;
+		$this->blockNetworkIdsAreHashes = false;
+		$this->enableTickDeathSystems = false;
+		$this->networkPermissions = new NetworkPermissions(false);
+		$this->playerActorProperties = new CacheableNbt(new CompoundTag());
+		$this->blockPaletteChecksum = 0;
+	}
+
+	private function encodeLegacyR12Payload(PacketSerializer $out) : void{
+		$out->putActorUniqueId($this->actorUniqueId);
+		$out->putActorRuntimeId($this->actorRuntimeId);
+		$out->putVarInt($this->playerGamemode);
+		$out->putVector3($this->playerPosition);
+		$out->putLFloat($this->pitch);
+		$out->putLFloat($this->yaw);
+
+		$levelSettings = $this->levelSettings;
+		$out->putVarInt($levelSettings->seed);
+		$out->putVarInt($levelSettings->spawnSettings->getDimension());
+		$out->putVarInt($levelSettings->generator);
+		$out->putVarInt($levelSettings->worldGamemode);
+		$out->putVarInt($levelSettings->difficulty);
+		$out->putBlockPosition($levelSettings->spawnPosition);
+		$out->putBool($levelSettings->hasAchievementsDisabled);
+		$out->putVarInt($levelSettings->time);
+		$out->putBool($levelSettings->eduEditionOffer !== 0);
+		$out->putBool($levelSettings->hasEduFeaturesEnabled);
+		$out->putLFloat($levelSettings->rainLevel);
+		$out->putLFloat($levelSettings->lightningLevel);
+		$out->putBool($levelSettings->hasConfirmedPlatformLockedContent);
+		$out->putBool($levelSettings->isMultiplayerGame);
+		$out->putBool($levelSettings->hasLANBroadcast);
+		$out->putVarInt($levelSettings->xboxLiveBroadcastMode);
+		$out->putVarInt($levelSettings->platformBroadcastMode);
+		$out->putBool($levelSettings->commandsEnabled);
+		$out->putBool($levelSettings->isTexturePacksRequired);
+		$out->putGameRules($levelSettings->gameRules, true);
+		$out->putBool($levelSettings->hasBonusChestEnabled);
+		$out->putBool($levelSettings->hasStartWithMapEnabled);
+		$out->putVarInt($levelSettings->defaultPlayerPermission);
+		$out->putLInt($levelSettings->serverChunkTickRadius);
+		$out->putBool($levelSettings->hasLockedBehaviorPack);
+		$out->putBool($levelSettings->hasLockedResourcePack);
+		$out->putBool($levelSettings->isFromLockedWorldTemplate);
+		$out->putBool($levelSettings->useMsaGamertagsOnly);
+		$out->putBool($levelSettings->isFromWorldTemplate);
+		$out->putBool($levelSettings->isWorldTemplateOptionLocked);
+		$out->putBool($levelSettings->onlySpawnV1Villagers);
+
+		$out->putString($this->levelId);
+		$out->putString($this->worldName);
+		$out->putString($this->premiumWorldTemplateId);
+		$out->putBool($this->isTrial);
+		$out->putLLong($this->currentTick);
+		$out->putVarInt($this->enchantmentSeed);
+		$out->put(LegacyProtocolData::getR12EncodedBlockTable());
+		$out->put(LegacyProtocolData::getR12EncodedItemTable());
+		$out->putString($this->multiplayerCorrelationId);
 	}
 
 	private function getEncodedBlockPalette(PacketSerializer $in) : void{
