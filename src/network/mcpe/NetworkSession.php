@@ -1019,8 +1019,12 @@ class NetworkSession{
 	}
 
 	public function notifyTerrainReady() : void{
-		$this->logger->debug("Sending spawn notification, waiting for spawn response");
+		$this->logger->debug("Sending spawn notification" . ($this->getProtocolId() >= ProtocolInfo::PROTOCOL_1_16_0 ? ", waiting for spawn response" : ""));
 		$this->sendDataPacket(PlayStatusPacket::create(PlayStatusPacket::PLAYER_SPAWN));
+		if($this->getProtocolId() < ProtocolInfo::PROTOCOL_1_16_0){
+			$this->onClientSpawnResponse();
+			return;
+		}
 		$this->setHandler(new SpawnResponsePacketHandler($this->onClientSpawnResponse(...)));
 	}
 
