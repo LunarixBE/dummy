@@ -25,6 +25,7 @@ namespace pocketmine\network\mcpe;
 
 use pocketmine\network\mcpe\compression\CompressBatchPromise;
 use pocketmine\network\mcpe\compression\Compressor;
+use pocketmine\network\mcpe\compression\ZlibCompressor;
 use pocketmine\network\mcpe\convert\TypeConverter;
 use pocketmine\network\mcpe\protocol\LevelChunkPacket;
 use pocketmine\network\mcpe\protocol\ProtocolInfo;
@@ -88,7 +89,8 @@ class ChunkRequestTask extends AsyncTask{
 
 		$compressor = $this->compressor->deserialize();
 		$protocolAddition = $this->mappingProtocol >= ProtocolInfo::PROTOCOL_1_20_60 ? chr($compressor->getNetworkId()) : '';
-		$this->setResult($protocolAddition . $compressor->compress($stream->getBuffer()));
+		$compressed = $compressor instanceof ZlibCompressor ? $compressor->compressForProtocol($stream->getBuffer(), $this->mappingProtocol) : $compressor->compress($stream->getBuffer());
+		$this->setResult($protocolAddition . $compressed);
 	}
 
 	public function onCompletion() : void{

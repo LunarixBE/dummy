@@ -70,11 +70,11 @@ abstract class DataPacket implements Packet{
 	 * @throws PacketDecodeException
 	 */
 	protected function decodeHeader(PacketSerializer $in) : void{
-		$header = $in->getUnsignedVarInt();
 		if(PacketIdTranslator::isLegacyProtocol($in->getProtocolId())){
-			$pid = PacketIdTranslator::fromNetworkId($in->getProtocolId(), $header);
+			$networkId = $in->getByte();
+			$pid = PacketIdTranslator::fromNetworkId($in->getProtocolId(), $networkId);
 			if($pid === null){
-				throw new PacketDecodeException("Unknown legacy packet ID $header");
+				throw new PacketDecodeException("Unknown legacy packet ID $networkId");
 			}
 			if($pid !== static::NETWORK_ID){
 				throw new PacketDecodeException("Expected " . static::NETWORK_ID . " for packet ID, got $pid");
@@ -84,6 +84,7 @@ abstract class DataPacket implements Packet{
 			return;
 		}
 
+		$header = $in->getUnsignedVarInt();
 		$pid = $header & self::PID_MASK;
 		if($pid !== static::NETWORK_ID){
 			//TODO: this means a logical error in the code, but how to prevent it from happening?
@@ -109,7 +110,7 @@ abstract class DataPacket implements Packet{
 
 	protected function encodeHeader(PacketSerializer $out) : void{
 		if(PacketIdTranslator::isLegacyProtocol($out->getProtocolId())){
-			$out->putUnsignedVarInt(PacketIdTranslator::toNetworkId($out->getProtocolId(), static::NETWORK_ID));
+			$out->putByte(PacketIdTranslator::toNetworkId($out->getProtocolId(), static::NETWORK_ID));
 			return;
 		}
 

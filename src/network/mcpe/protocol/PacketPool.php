@@ -26,6 +26,7 @@ namespace pocketmine\network\mcpe\protocol;
 use pocketmine\network\mcpe\convert\PacketIdTranslator;
 use pocketmine\utils\Binary;
 use pocketmine\utils\BinaryDataException;
+use function ord;
 
 class PacketPool{
 	protected static ?PacketPool $instance = null;
@@ -298,11 +299,16 @@ class PacketPool{
 	 * @throws BinaryDataException
 	 */
 	public function getPacket(string $buffer, int $protocolId = ProtocolInfo::CURRENT_PROTOCOL) : ?Packet{
-		$offset = 0;
-		$header = Binary::readUnsignedVarInt($buffer, $offset);
-		$pid = PacketIdTranslator::isLegacyProtocol($protocolId) ?
-			PacketIdTranslator::fromNetworkId($protocolId, $header) :
-			($header & DataPacket::PID_MASK);
+		if(PacketIdTranslator::isLegacyProtocol($protocolId)){
+			if($buffer === ""){
+				throw new BinaryDataException("No bytes left in buffer");
+			}
+			$pid = PacketIdTranslator::fromNetworkId($protocolId, ord($buffer[0]));
+		}else{
+			$offset = 0;
+			$header = Binary::readUnsignedVarInt($buffer, $offset);
+			$pid = $header & DataPacket::PID_MASK;
+		}
 
 		return $pid !== null ? $this->getPacketById($pid) : null;
 	}

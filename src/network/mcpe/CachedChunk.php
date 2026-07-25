@@ -25,6 +25,7 @@ namespace pocketmine\network\mcpe;
 
 use BadFunctionCallException;
 use pocketmine\network\mcpe\compression\Compressor;
+use pocketmine\network\mcpe\compression\ZlibCompressor;
 use pocketmine\network\mcpe\protocol\LevelChunkPacket;
 use pocketmine\network\mcpe\protocol\ProtocolInfo;
 use pocketmine\network\mcpe\protocol\serializer\PacketBatch;
@@ -91,12 +92,12 @@ class CachedChunk{
 
 		$protocolAddition = $protocolId >= ProtocolInfo::PROTOCOL_1_20_60 ? chr($compressor->getNetworkId()) : '';
 		$stream = new BinaryStream();
-		PacketBatch::encodePackets($stream, $encoderContext, [$this->createPacket($chunkX, $chunkZ, $dimensionId, $chunkData)]);
-		$this->packet = $protocolAddition . $compressor->compress($stream->getBuffer());
+		PacketBatch::encodePackets($stream, $protocolId, [$this->createPacket($chunkX, $chunkZ, $dimensionId, $chunkData)]);
+		$this->packet = $protocolAddition . ($compressor instanceof ZlibCompressor ? $compressor->compressForProtocol($stream->getBuffer(), $protocolId) : $compressor->compress($stream->getBuffer()));
 
 		$stream = new BinaryStream();
-		PacketBatch::encodePackets($stream, $encoderContext, [$this->createCachablePacket($chunkX, $chunkZ, $dimensionId, $chunkData)]);
-		$this->cachablePacket = $protocolAddition . $compressor->compress($stream->getBuffer());
+		PacketBatch::encodePackets($stream, $protocolId, [$this->createCachablePacket($chunkX, $chunkZ, $dimensionId, $chunkData)]);
+		$this->cachablePacket = $protocolAddition . ($compressor instanceof ZlibCompressor ? $compressor->compressForProtocol($stream->getBuffer(), $protocolId) : $compressor->compress($stream->getBuffer()));
 	}
 
 	public function getCacheablePacket() : string{

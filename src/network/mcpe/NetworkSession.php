@@ -240,17 +240,32 @@ class NetworkSession{
 		$this->logger->debug("Session start handshake completed, awaiting login packet");
 		$this->flushGamePacketQueue();
 		$this->enableCompression = true;
+		$this->setLoginPacketHandler(true);
+	}
+
+	private function setLoginPacketHandler(bool $announcePlayer) : void{
 		$this->setHandler(new LoginPacketHandler(
 			$this->server,
 			$this,
-			function(PlayerInfo $info) : void{
+			function(PlayerInfo $info) use ($announcePlayer) : void{
 				$this->info = $info;
-				$this->logger->info($this->server->getLanguage()->translate(KnownTranslationFactory::pocketmine_network_session_playerName(TextFormat::AQUA . $info->getUsername() . TextFormat::RESET)));
+				if($announcePlayer){
+					$this->logger->info($this->server->getLanguage()->translate(KnownTranslationFactory::pocketmine_network_session_playerName(TextFormat::AQUA . $info->getUsername() . TextFormat::RESET)));
+				}
 				$this->logger->setPrefix($this->getLogPrefix());
 				$this->manager->markLoginReceived($this);
 			},
 			$this->setAuthenticationStatus(...)
 		));
+	}
+
+	private static function isZlibCompressedPayload(string $payload) : bool{
+		if(strlen($payload) < 2){
+			return false;
+		}
+		$cmf = ord($payload[0]);
+		$flg = ord($payload[1]);
+		return ($cmf & 0x0f) === 8 && (($cmf >> 4) & 0x0f) <= 7 && (($cmf << 8) + $flg) % 31 === 0;
 	}
 
 	protected function createPlayer() : void{
@@ -383,8 +398,6 @@ class NetworkSession{
 
 		Timings::$playerNetworkReceive->startTiming();
 		try{
-			$this->packetBatchLimiter->decrement();
-
 			if($this->cipher !== null){
 				Timings::$playerNetworkReceiveDecrypt->startTiming();
 				try{
@@ -400,6 +413,15 @@ class NetworkSession{
 			if(strlen($payload) < 1){
 				throw new PacketHandlingException("No bytes in payload");
 			}
+
+			if(!$this->enableCompression && self::isZlibCompressedPayload($payload)){
+				$this->enableCompression = true;
+				$this->setLoginPacketHandler(false);
+				$this->handleEncoded($payload);
+				return;
+			}
+
+			$this->packetBatchLimiter->decrement();
 
 			if($this->enableCompression){
 				if($this->protocolId >= ProtocolInfo::PROTOCOL_1_20_60){
@@ -454,17 +476,7 @@ class NetworkSession{
 			}catch(PacketDecodeException|BinaryDataException $e){
 				if (!$this->enableCompression) {
 					$this->enableCompression = true;
-					$this->setHandler(new LoginPacketHandler(
-						$this->server,
-						$this,
-						function(PlayerInfo $info) : void{
-							$this->info = $info;
-							//$this->logger->info($this->server->getLanguage()->translate(KnownTranslationFactory::pocketmine_network_session_playerName(TextFormat::AQUA . $info->getUsername() . TextFormat::RESET)));
-							$this->logger->setPrefix($this->getLogPrefix());
-							$this->manager->markLoginReceived($this);
-						},
-						$this->setAuthenticationStatus(...)
-					));
+					$this->setLoginPacketHandler(false);
 					$this->handleEncoded($payload);
 					return;
 				}

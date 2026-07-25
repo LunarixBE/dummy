@@ -2,19 +2,22 @@
 
 /*
  *
- *  ____            _        _   __  __ _                  __  __ ____
- * |  _ \ ___   ___| | _____| |_|  \/  (_)_ __   ___      |  \/  |  _ \
- * | |_) / _ \ / __| |/ / _ \ __| |\/| | | '_ \ / _ \_____| |\/| | |_) |
- * |  __/ (_) | (__|   <  __/ |_| |  | | | | | |  __/_____| |  | |  __/
- * |_|   \___/ \___|_|\_\___|\__|_|  |_|_|_| |_|\___|     |_|  |_|_|
+ *  _____                    _   _       _
+ * | ____|___ ___  ___ _ __ | |_(_) __ _| |
+ * |  _| / __/ __|/ _ \ '_ \| __| |/ _` | |
+ * | |___\__ \__ \  __/ | | | |_| | (_| | |
+ * |_____|___/___/\___|_| |_|\__|_|\__,_|_|
+ *
+ * Essential — PocketMine-MP Fork
+ * Supported MCPE/Bedrock versions: 1.12, 1.16 - 1.26.x
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
  *
- * @author PocketMine Team
- * @link http://www.pocketmine.net/
+ * @author Essential Team
+ * @link https://github.com/BakuTeam/Essential
  *
  *
  */
@@ -23,14 +26,17 @@ declare(strict_types=1);
 
 namespace pocketmine\network\mcpe\compression;
 
+use pocketmine\network\mcpe\protocol\ProtocolInfo;
 use pocketmine\network\mcpe\protocol\types\CompressionAlgorithm;
 use pocketmine\utils\SingletonTrait;
 use pocketmine\utils\Utils;
 use function function_exists;
 use function libdeflate_deflate_compress;
+use function libdeflate_zlib_compress;
 use function strlen;
 use function zlib_decode;
 use function zlib_encode;
+use const ZLIB_ENCODING_DEFLATE;
 use const ZLIB_ENCODING_RAW;
 
 final class ZlibCompressor implements Compressor{
@@ -69,12 +75,25 @@ final class ZlibCompressor implements Compressor{
 	}
 
 	public function compress(string $payload) : string{
+		return $this->compressWithEncoding($payload, ZLIB_ENCODING_RAW);
+	}
+
+	public function compressForProtocol(string $payload, int $protocolId) : string{
+		return $this->compressWithEncoding($payload, $protocolId < ProtocolInfo::PROTOCOL_1_16_0 ? ZLIB_ENCODING_DEFLATE : ZLIB_ENCODING_RAW);
+	}
+
+	private function compressWithEncoding(string $payload, int $encoding) : string{
 		$compressible = $this->minCompressionSize !== null && strlen($payload) >= $this->minCompressionSize;
 		$level = $compressible ? $this->level : 0;
 
-		return function_exists('libdeflate_deflate_compress') ?
-			libdeflate_deflate_compress($payload, $level) :
-			Utils::assumeNotFalse(zlib_encode($payload, ZLIB_ENCODING_RAW, $level), "ZLIB compression failed");
+		if($encoding === ZLIB_ENCODING_DEFLATE && function_exists('libdeflate_zlib_compress')){
+			return libdeflate_zlib_compress($payload, $level);
+		}
+		if($encoding === ZLIB_ENCODING_RAW && function_exists('libdeflate_deflate_compress')){
+			return libdeflate_deflate_compress($payload, $level);
+		}
+
+		return Utils::assumeNotFalse(zlib_encode($payload, $encoding, $level), "ZLIB compression failed");
 	}
 
 	public function getNetworkId() : int{
