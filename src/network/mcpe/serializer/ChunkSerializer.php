@@ -43,6 +43,7 @@ use function chr;
 use function count;
 use function min;
 use function ord;
+use function pack;
 use function str_repeat;
 
 final class ChunkSerializer{
@@ -243,9 +244,12 @@ final class ChunkSerializer{
 		$subChunkCount = self::getLegacyR12SubChunkCount($chunk, $dimensionId);
 		$blockTranslator = $typeConverter->getBlockTranslator();
 
+		$stream->putByte($subChunkCount);
 		for($y = 0; $y < $subChunkCount; ++$y){
 			self::serializeLegacyR12SubChunk($chunk->getSubChunk($y), $blockTranslator, $stream);
 		}
+
+		$stream->put(pack("v*", ...$chunk->getHeightMapArray()));
 
 		$biome = str_repeat(chr(BiomeIds::OCEAN), 256);
 		for($x = 0; $x < 16; ++$x){
@@ -260,12 +264,7 @@ final class ChunkSerializer{
 		}
 		$stream->put($biome);
 		$stream->putByte(0); //border block array count
-
-		if($tiles !== null){
-			$stream->put($tiles);
-		}else{
-			$stream->put(self::serializeTiles($chunk, $typeConverter));
-		}
+		$stream->putVarInt(0); //extra data count
 
 		return $stream->getBuffer();
 	}
