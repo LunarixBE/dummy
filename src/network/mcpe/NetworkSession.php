@@ -890,7 +890,7 @@ class NetworkSession{
 			return;
 		}
 		if($error === null){
-			if($authenticated && !($this->info instanceof XboxLivePlayerInfo)){
+			if($authenticated && !($this->info instanceof XboxLivePlayerInfo) && $this->getProtocolId() >= ProtocolInfo::PROTOCOL_1_16_0){
 				$error = "Expected XUID but none found";
 			}elseif($clientPubKey === null){
 				$error = "Missing client public key"; //failsafe
