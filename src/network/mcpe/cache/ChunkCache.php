@@ -121,15 +121,6 @@ class ChunkCache implements ChunkListener{
 				}
 			}
 		}
-		\GlobalLogger::get()->info(sprintf(
-			"[ChunkDbg] w=%s c=%d,%d proto=%d subCount=%d highestBlockY=%s",
-			$this->world->getFolderName(),
-			$chunkX,
-			$chunkZ,
-			$typeConverter->getProtocolId(),
-			$dbgSubCount,
-			$dbgMaxY === null ? "none" : (string) $dbgMaxY
-		));
 
 		$this->world->timings->syncChunkSendPrepare->startTiming();
 		try{
