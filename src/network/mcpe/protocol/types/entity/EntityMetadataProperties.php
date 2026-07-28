@@ -31,6 +31,8 @@ final class EntityMetadataProperties{
 		//NOOP
 	}
 
+	private const PROTOCOL_1_12_LAST_SUPPORTED_PROPERTY_ID = 109;
+
 	/*
 	 * Readers beware: this isn't a nice list. Some of the properties have different types for different entities, and
 	 * are used for entirely different things.
@@ -189,7 +191,11 @@ final class EntityMetadataProperties{
 	public static function encode(array $types, int $protocolId) : array{
 		$properties = [];
 		foreach($types as $type => $val) {
-			$properties[self::convertProperty($protocolId, $type)] = $val;
+			$propertyId = self::convertProperty($protocolId, $type);
+			if($protocolId === ProtocolInfo::PROTOCOL_1_12_0 && $propertyId > self::PROTOCOL_1_12_LAST_SUPPORTED_PROPERTY_ID){
+				continue;
+			}
+			$properties[$propertyId] = $val;
 		}
 		return $properties;
 	}
