@@ -27,7 +27,6 @@ use pocketmine\math\Vector3;
 use pocketmine\nbt\tag\CompoundTag;
 use pocketmine\nbt\tag\ListTag;
 use pocketmine\nbt\TreeRoot;
-use pocketmine\network\mcpe\convert\LegacyProtocolData;
 use pocketmine\network\mcpe\protocol\serializer\NetworkNbtSerializer;
 use pocketmine\network\mcpe\protocol\serializer\PacketSerializer;
 use pocketmine\network\mcpe\protocol\types\BlockPosition;
@@ -351,28 +350,11 @@ class StartGamePacket extends DataPacket implements ClientboundPacket{
 		$levelSettings->hasAchievementsDisabled = $in->getBool();
 		$levelSettings->time = $in->getVarInt();
 		$levelSettings->eduEditionOffer = $in->getBool() ? 1 : 0;
-		$levelSettings->hasEduFeaturesEnabled = $in->getBool();
 		$levelSettings->rainLevel = $in->getLFloat();
 		$levelSettings->lightningLevel = $in->getLFloat();
-		$levelSettings->hasConfirmedPlatformLockedContent = $in->getBool();
-		$levelSettings->isMultiplayerGame = $in->getBool();
-		$levelSettings->hasLANBroadcast = $in->getBool();
-		$levelSettings->xboxLiveBroadcastMode = $in->getVarInt();
-		$levelSettings->platformBroadcastMode = $in->getVarInt();
 		$levelSettings->commandsEnabled = $in->getBool();
 		$levelSettings->isTexturePacksRequired = $in->getBool();
 		$levelSettings->gameRules = $in->getGameRules(true);
-		$levelSettings->hasBonusChestEnabled = $in->getBool();
-		$levelSettings->hasStartWithMapEnabled = $in->getBool();
-		$levelSettings->defaultPlayerPermission = $in->getVarInt();
-		$levelSettings->serverChunkTickRadius = $in->getLInt();
-		$levelSettings->hasLockedBehaviorPack = $in->getBool();
-		$levelSettings->hasLockedResourcePack = $in->getBool();
-		$levelSettings->isFromLockedWorldTemplate = $in->getBool();
-		$levelSettings->useMsaGamertagsOnly = $in->getBool();
-		$levelSettings->isFromWorldTemplate = $in->getBool();
-		$levelSettings->isWorldTemplateOptionLocked = $in->getBool();
-		$levelSettings->onlySpawnV1Villagers = $in->getBool();
 		$levelSettings->experiments = new Experiments([], false);
 		$this->levelSettings = $levelSettings;
 
@@ -382,23 +364,10 @@ class StartGamePacket extends DataPacket implements ClientboundPacket{
 		$this->isTrial = $in->getBool();
 		$this->playerMovementSettings = new PlayerMovementSettings(ServerAuthMovementMode::SERVER_AUTHORITATIVE_V2, 0, false);
 		$this->currentTick = $in->getLLong();
-		$this->enchantmentSeed = $in->getVarInt();
-
 		$this->blockPalette = [];
-		for($i = 0, $len = $in->getUnsignedVarInt(); $i < $len; ++$i){
-			$in->getString();
-			$in->getSignedLShort();
-			$in->getSignedLShort();
-		}
-
 		$this->itemTable = [];
-		for($i = 0, $count = $in->getUnsignedVarInt(); $i < $count; ++$i){
-			$stringId = $in->getString();
-			$numericId = $in->getSignedLShort();
-			$this->itemTable[] = new ItemTypeEntry($stringId, $numericId, false, -1, new CacheableNbt(new CompoundTag()));
-		}
-
-		$this->multiplayerCorrelationId = $in->getString();
+		$this->enchantmentSeed = 0;
+		$this->multiplayerCorrelationId = "";
 		$this->enableNewInventorySystem = false;
 		$this->serverSoftwareVersion = "";
 		$this->worldTemplateId = Uuid::fromString(Uuid::NIL);
@@ -428,38 +397,17 @@ class StartGamePacket extends DataPacket implements ClientboundPacket{
 		$out->putBool($levelSettings->hasAchievementsDisabled);
 		$out->putVarInt($levelSettings->time);
 		$out->putBool($levelSettings->eduEditionOffer !== 0);
-		$out->putBool($levelSettings->hasEduFeaturesEnabled);
 		$out->putLFloat($levelSettings->rainLevel);
 		$out->putLFloat($levelSettings->lightningLevel);
-		$out->putBool($levelSettings->hasConfirmedPlatformLockedContent);
-		$out->putBool($levelSettings->isMultiplayerGame);
-		$out->putBool($levelSettings->hasLANBroadcast);
-		$out->putVarInt($levelSettings->xboxLiveBroadcastMode);
-		$out->putVarInt($levelSettings->platformBroadcastMode);
 		$out->putBool($levelSettings->commandsEnabled);
 		$out->putBool($levelSettings->isTexturePacksRequired);
 		$out->putGameRules($levelSettings->gameRules, true);
-		$out->putBool($levelSettings->hasBonusChestEnabled);
-		$out->putBool($levelSettings->hasStartWithMapEnabled);
-		$out->putVarInt($levelSettings->defaultPlayerPermission);
-		$out->putLInt($levelSettings->serverChunkTickRadius);
-		$out->putBool($levelSettings->hasLockedBehaviorPack);
-		$out->putBool($levelSettings->hasLockedResourcePack);
-		$out->putBool($levelSettings->isFromLockedWorldTemplate);
-		$out->putBool($levelSettings->useMsaGamertagsOnly);
-		$out->putBool($levelSettings->isFromWorldTemplate);
-		$out->putBool($levelSettings->isWorldTemplateOptionLocked);
-		$out->putBool($levelSettings->onlySpawnV1Villagers);
 
 		$out->putString($this->levelId);
 		$out->putString($this->worldName);
 		$out->putString($this->premiumWorldTemplateId);
 		$out->putBool($this->isTrial);
 		$out->putLLong($this->currentTick);
-		$out->putVarInt($this->enchantmentSeed);
-		$out->put(LegacyProtocolData::getR12EncodedBlockTable());
-		$out->put(LegacyProtocolData::getR12EncodedItemTable());
-		$out->putString($this->multiplayerCorrelationId);
 	}
 
 	private function getEncodedBlockPalette(PacketSerializer $in) : void{
