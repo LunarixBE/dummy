@@ -47,6 +47,7 @@ class BiomeDefinitionListPacket extends DataPacket implements ClientboundPacket{
 
 	/** @phpstan-var CacheableNbt<CompoundTag> */
 	private ?CacheableNbt $legacyDefinitions;
+	private ?string $legacyRawDefinitions;
 
 	/**
 	 * @generate-create-func
@@ -56,11 +57,12 @@ class BiomeDefinitionListPacket extends DataPacket implements ClientboundPacket{
 	 * @phpstan-param list<string>              $strings
 	 * @phpstan-param CacheableNbt<CompoundTag> $legacyDefinitions
 	 */
-	private static function internalCreate(?array $definitionData, ?array $strings, ?CacheableNbt $legacyDefinitions) : self{
+	private static function internalCreate(?array $definitionData, ?array $strings, ?CacheableNbt $legacyDefinitions, ?string $legacyRawDefinitions = null) : self{
 		$result = new self();
 		$result->definitionData = $definitionData;
 		$result->strings = $strings;
 		$result->legacyDefinitions = $legacyDefinitions;
+		$result->legacyRawDefinitions = $legacyRawDefinitions;
 		return $result;
 	}
 
@@ -79,6 +81,10 @@ class BiomeDefinitionListPacket extends DataPacket implements ClientboundPacket{
 	 */
 	public static function createLegacy(CacheableNbt $definitions) : self{
 		return self::internalCreate(null, null, $definitions);
+	}
+
+	public static function createLegacyRaw(string $definitions) : self{
+		return self::internalCreate(null, null, null, $definitions);
 	}
 
 	/**
@@ -156,14 +162,24 @@ class BiomeDefinitionListPacket extends DataPacket implements ClientboundPacket{
 	}
 
 	protected function decodePayload(PacketSerializer $in) : void{
+		if($in->getProtocolId() === ProtocolInfo::PROTOCOL_1_12_0){
+			$this->legacyRawDefinitions = $in->getRemaining();
+			$this->legacyDefinitions = null;
+			$this->definitionData = null;
+			$this->strings = null;
+			return;
+		}
+
 		if($in->getProtocolId() < ProtocolInfo::PROTOCOL_1_21_80){
 			$this->legacyDefinitions = new CacheableNbt($in->getNbtCompoundRoot());
+			$this->legacyRawDefinitions = null;
 			$this->definitionData = null;
 			$this->strings = null;
 			return;
 		}
 
 		$this->legacyDefinitions = null;
+		$this->legacyRawDefinitions = null;
 		for($i = 0, $count = $in->getUnsignedVarInt(); $i < $count; ++$i){
 			$this->definitionData[] = BiomeDefinitionData::read($in);
 		}
@@ -174,6 +190,11 @@ class BiomeDefinitionListPacket extends DataPacket implements ClientboundPacket{
 	}
 
 	protected function encodePayload(PacketSerializer $out) : void{
+		if($out->getProtocolId() === ProtocolInfo::PROTOCOL_1_12_0 && $this->legacyRawDefinitions !== null){
+			$out->put($this->legacyRawDefinitions);
+			return;
+		}
+
 		if($out->getProtocolId() < ProtocolInfo::PROTOCOL_1_21_80){
 			if($this->legacyDefinitions === null){
 				throw new \LogicException("Legacy definitions not set");
