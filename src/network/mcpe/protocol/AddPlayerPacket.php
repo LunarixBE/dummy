@@ -196,7 +196,7 @@ class AddPlayerPacket extends DataPacket implements ClientboundPacket{
 
 		if($out->getProtocolId() >= ProtocolInfo::PROTOCOL_1_19_10){
 			$this->abilitiesPacket->encodePayload($out);
-		}else{
+		}elseif($out->getProtocolId() >= ProtocolInfo::PROTOCOL_1_16_0){
 			$packet = AdventureSettingsPacket::create(
 				0,
 				$this->abilitiesPacket->getData()->getCommandPermission(),
@@ -206,6 +206,13 @@ class AddPlayerPacket extends DataPacket implements ClientboundPacket{
 				$this->abilitiesPacket->getData()->getTargetActorUniqueId()
 			);
 			$packet->encodePayload($out);
+		}else{
+			$out->putUnsignedVarInt(0);
+			$out->putUnsignedVarInt(0);
+			$out->putUnsignedVarInt(0);
+			$out->putUnsignedVarInt(0);
+			$out->putUnsignedVarInt(0);
+			$out->putLLong(0);
 		}
 
 		$out->putUnsignedVarInt(count($this->links));

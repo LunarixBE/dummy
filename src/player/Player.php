@@ -574,6 +574,9 @@ class Player extends Human implements CommandSender, ChunkListener, IPlayer{
 	}
 
 	public function spawnTo(Player $player) : void{
+		if($player === $this && $this->getNetworkSession()->getProtocolId() < ProtocolInfo::PROTOCOL_1_16_0){
+			return;
+		}
 		if($this->isAlive() && $player->isAlive() && $player->canSee($this) && !$this->isSpectator()){
 			parent::spawnTo($player);
 		}
