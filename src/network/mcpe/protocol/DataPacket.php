@@ -71,7 +71,7 @@ abstract class DataPacket implements Packet{
 	 */
 	protected function decodeHeader(PacketSerializer $in) : void{
 		if(PacketIdTranslator::isLegacyProtocol($in->getProtocolId())){
-			$networkId = $in->getByte();
+			$networkId = $in->getUnsignedVarInt();
 			$pid = PacketIdTranslator::fromNetworkId($in->getProtocolId(), $networkId);
 			if($pid === null){
 				throw new PacketDecodeException("Unknown legacy packet ID $networkId");
@@ -110,7 +110,7 @@ abstract class DataPacket implements Packet{
 
 	protected function encodeHeader(PacketSerializer $out) : void{
 		if(PacketIdTranslator::isLegacyProtocol($out->getProtocolId())){
-			$out->putByte(PacketIdTranslator::toNetworkId($out->getProtocolId(), static::NETWORK_ID));
+			$out->putUnsignedVarInt(PacketIdTranslator::toNetworkId($out->getProtocolId(), static::NETWORK_ID));
 			return;
 		}
 

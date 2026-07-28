@@ -26,7 +26,6 @@ namespace pocketmine\network\mcpe\protocol;
 use pocketmine\network\mcpe\convert\PacketIdTranslator;
 use pocketmine\utils\Binary;
 use pocketmine\utils\BinaryDataException;
-use function ord;
 
 class PacketPool{
 	protected static ?PacketPool $instance = null;
@@ -303,7 +302,8 @@ class PacketPool{
 			if($buffer === ""){
 				throw new BinaryDataException("No bytes left in buffer");
 			}
-			$pid = PacketIdTranslator::fromNetworkId($protocolId, ord($buffer[0]));
+			$offset = 0;
+			$pid = PacketIdTranslator::fromNetworkId($protocolId, Binary::readUnsignedVarInt($buffer, $offset));
 		}else{
 			$offset = 0;
 			$header = Binary::readUnsignedVarInt($buffer, $offset);

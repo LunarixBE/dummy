@@ -162,6 +162,36 @@ class InGamePacketHandler extends PacketHandler{
 	}
 
 	public function handleMovePlayer(MovePlayerPacket $packet) : bool{
+		if($this->session->getProtocolId() < ProtocolInfo::PROTOCOL_1_16_0){
+			$rawPos = $packet->position;
+			foreach([$rawPos->x, $rawPos->y, $rawPos->z, $packet->yaw, $packet->headYaw, $packet->pitch] as $float){
+				if(is_infinite($float) || is_nan($float)){
+					$this->session->getLogger()->debug("Invalid movement received, contains NAN/INF components");
+					return false;
+				}
+			}
+
+			$yaw = fmod($packet->yaw, 360);
+			$pitch = fmod($packet->pitch, 360);
+			if($yaw < 0){
+				$yaw += 360;
+			}
+			$this->player->setRotation($yaw, $pitch);
+
+			$newPos = $rawPos->subtract(0, 1.62, 0)->round(4);
+			if($this->forceMoveSync){
+				$curPos = $this->player->getLocation();
+				if($newPos->distanceSquared($curPos) > 1){
+					$this->session->getLogger()->debug("Got outdated pre-teleport movement, received " . $newPos . ", expected " . $curPos);
+					return true;
+				}
+				$this->forceMoveSync = false;
+			}
+
+			$this->player->handleMovement($newPos);
+			return true;
+		}
+
 		//The client sends this every time it lands on the ground, even when using PlayerAuthInputPacket.
 		//Silence the debug spam that this causes.
 		return true;
