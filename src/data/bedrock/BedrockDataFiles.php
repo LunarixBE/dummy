@@ -32,6 +32,7 @@ final class BedrockDataFiles{
 
 	public const BANNER_PATTERNS_JSON = BEDROCK_DATA_PATH . '/banner_patterns.json';
 	public const BIOME_DEFINITIONS_JSON = BEDROCK_DATA_PATH . '/biome_definitions.json';
+	public const BIOME_DEFINITIONS_1_12_NBT = BEDROCK_DATA_PATH . '/biome_definitions-1.12.0.nbt';
 	public const BIOME_DEFINITIONS_NBT = BEDROCK_DATA_PATH . '/biome_definitions.nbt';
 	public const BIOME_DEFINITIONS_FULL_NBT = BEDROCK_DATA_PATH . '/biome_definitions_full.nbt';
 	public const BIOME_ID_MAP_JSON = BEDROCK_DATA_PATH . '/biome_id_map.json';
@@ -85,6 +86,7 @@ final class BedrockDataFiles{
 	public const COMMAND_ARG_TYPES_JSON = BEDROCK_DATA_PATH . '/command_arg_types.json';
 	public const CREATIVE = BEDROCK_DATA_PATH . '/creative';
 	public const ENTITY_ID_MAP_JSON = BEDROCK_DATA_PATH . '/entity_id_map.json';
+	public const ENTITY_IDENTIFIERS_1_12_NBT = BEDROCK_DATA_PATH . '/entity_identifiers-1.12.0.nbt';
 	public const ENTITY_IDENTIFIERS_NBT = BEDROCK_DATA_PATH . '/entity_identifiers.nbt';
 	public const ENTITY_IDENTIFIERS_1_16_100_NBT = BEDROCK_DATA_PATH . '/entity_identifiers-1.16.100.nbt';
 	public const ENUMS = BEDROCK_DATA_PATH . '/enums';

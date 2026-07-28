@@ -25,6 +25,7 @@ namespace pocketmine\network\mcpe\handler;
 
 use pocketmine\lang\KnownTranslationFactory;
 use pocketmine\network\mcpe\NetworkSession;
+use pocketmine\network\mcpe\protocol\ClientCacheStatusPacket;
 use pocketmine\network\mcpe\protocol\ProtocolInfo;
 use pocketmine\network\mcpe\protocol\ResourcePackChunkDataPacket;
 use pocketmine\network\mcpe\protocol\ResourcePackChunkRequestPacket;
@@ -194,6 +195,11 @@ class ResourcePacksPacketHandler extends PacketHandler{
 				return false;
 		}
 
+		return true;
+	}
+
+	public function handleClientCacheStatus(ClientCacheStatusPacket $packet) : bool{
+		//1.12 sends this before the chunk request handler is installed. We always send chunks without blob-cache hashes.
 		return true;
 	}
 

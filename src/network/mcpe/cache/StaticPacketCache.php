@@ -2,19 +2,22 @@
 
 /*
  *
- *  ____            _        _   __  __ _                  __  __ ____
- * |  _ \ ___   ___| | _____| |_|  \/  (_)_ __   ___      |  \/  |  _ \
- * | |_) / _ \ / __| |/ / _ \ __| |\/| | | '_ \ / _ \_____| |\/| | |_) |
- * |  __/ (_) | (__|   <  __/ |_| |  | | | | | |  __/_____| |  | |  __/
- * |_|   \___/ \___|_|\_\___|\__|_|  |_|_|_| |_|\___|     |_|  |_|_|
+ *  _____                    _   _       _
+ * | ____|___ ___  ___ _ __ | |_(_) __ _| |
+ * |  _| / __/ __|/ _ \ '_ \| __| |/ _` | |
+ * | |___\__ \__ \  __/ | | | |_| | (_| | |
+ * |_____|___/___/\___|_| |_|\__|_|\__,_|_|
+ *
+ * Essential — PocketMine-MP Fork
+ * Supported MCPE/Bedrock versions: 1.12, 1.16 - 1.26.x
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
  *
- * @author PocketMine Team
- * @link http://www.pocketmine.net/
+ * @author Essential Team
+ * @link https://github.com/BakuTeam/Essential
  *
  *
  */
@@ -106,7 +109,9 @@ class StaticPacketCache{
 	private static function make() : self{
 		return new self(
 			BiomeDefinitionListPacket::fromDefinitions(self::loadBiomeDefinitionModel(BedrockDataFiles::BIOME_DEFINITIONS_JSON)),
+			BiomeDefinitionListPacket::createLegacy(self::loadCompoundFromFile(BedrockDataFiles::BIOME_DEFINITIONS_1_12_NBT)),
 			BiomeDefinitionListPacket::createLegacy(self::loadCompoundFromFile(BedrockDataFiles::BIOME_DEFINITIONS_NBT)),
+			AvailableActorIdentifiersPacket::create(self::loadCompoundFromFile(BedrockDataFiles::ENTITY_IDENTIFIERS_1_12_NBT)),
 			AvailableActorIdentifiersPacket::create(self::loadCompoundFromFile(BedrockDataFiles::ENTITY_IDENTIFIERS_NBT)),
 			AvailableActorIdentifiersPacket::create(self::loadCompoundFromFile(BedrockDataFiles::ENTITY_IDENTIFIERS_1_16_100_NBT))
 		);
@@ -114,16 +119,24 @@ class StaticPacketCache{
 
 	public function __construct(
 		private BiomeDefinitionListPacket $biomeDefs,
+		private BiomeDefinitionListPacket $legacyR12BiomeDefs,
 		private BiomeDefinitionListPacket $legacyBiomeDefs,
+		private AvailableActorIdentifiersPacket $legacyR12AvailableActorIdentifiers,
 		private AvailableActorIdentifiersPacket $availableActorIdentifiers,
 		private AvailableActorIdentifiersPacket $legacyAvailableActorIdentifiers
 	){}
 
 	public function getBiomeDefs(int $protocolId) : BiomeDefinitionListPacket{
+		if($protocolId === ProtocolInfo::PROTOCOL_1_12_0){
+			return $this->legacyR12BiomeDefs;
+		}
 		return $protocolId >= ProtocolInfo::PROTOCOL_1_21_80 ? $this->biomeDefs : $this->legacyBiomeDefs;
 	}
 
 	public function getAvailableActorIdentifiers(int $protocolId) : AvailableActorIdentifiersPacket{
+		if($protocolId === ProtocolInfo::PROTOCOL_1_12_0){
+			return $this->legacyR12AvailableActorIdentifiers;
+		}
 		return $protocolId <= ProtocolInfo::PROTOCOL_1_16_210 ? $this->legacyAvailableActorIdentifiers : $this->availableActorIdentifiers;
 	}
 }
