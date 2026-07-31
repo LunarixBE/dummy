@@ -346,4 +346,6 @@ final class BlockTranslator{
 	public function getBlockStateDictionary() : BlockStateDictionary{ return $this->blockStateDictionary; }
 
 	public function getFallbackStateData() : BlockStateData{ return $this->fallbackStateData; }
+
+	public function getFallbackStateId() : int{ return $this->fallbackStateId; }
 }
