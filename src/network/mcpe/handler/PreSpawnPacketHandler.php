@@ -23,6 +23,7 @@ declare(strict_types=1);
 
 namespace pocketmine\network\mcpe\handler;
 
+use pocketmine\math\Vector3;
 use pocketmine\nbt\tag\CompoundTag;
 use pocketmine\network\mcpe\cache\CraftingDataCache;
 use pocketmine\network\mcpe\cache\StaticPacketCache;
@@ -75,6 +76,14 @@ class PreSpawnPacketHandler extends PacketHandler{
 			$levelSettings->worldGamemode = $typeConverter->coreGameModeToProtocol($this->server->getGamemode());
 			$levelSettings->difficulty = $world->getDifficulty();
 			$levelSettings->spawnPosition = BlockPosition::fromVector3($world->getSpawnLocation());
+
+			//DEBUG (legacy 1.12): test whether the client refuses to request chunks because of the spawn coordinates.
+			//Force a known-safe positive position for 1.12 only.
+			$isLegacyR12 = $protocolId === ProtocolInfo::PROTOCOL_1_12_0;
+			$startGamePlayerPosition = $isLegacyR12 ? new Vector3(256, 72, 256) : $this->player->getOffsetPosition($location);
+			if($isLegacyR12){
+				$levelSettings->spawnPosition = new BlockPosition(256, 72, 256);
+			}
 			$levelSettings->hasAchievementsDisabled = true;
 			$levelSettings->time = $world->getTime();
 			$levelSettings->eduEditionOffer = 0;
@@ -93,7 +102,7 @@ class PreSpawnPacketHandler extends PacketHandler{
 				$this->player->getId(),
 				$this->player->getId(),
 				$typeConverter->coreGameModeToProtocol($this->player->getGamemode()),
-				$this->player->getOffsetPosition($location),
+				$startGamePlayerPosition,
 				$location->pitch,
 				$location->yaw,
 				new CacheableNbt(CompoundTag::create()), //TODO: we don't care about this right now
