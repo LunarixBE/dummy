@@ -1298,6 +1298,9 @@ class NetworkSession{
 	private function sendChunkPacket(string $chunkPacket, \Closure $onCompletion, World $world) : void{
 		$world->timings->syncChunkSend->startTiming();
 		try{
+			if(PacketIdTranslator::isLegacyProtocol($this->getProtocolId())){
+				\GlobalLogger::get()->debug("[Legacy1.12] Queued chunk packet (" . strlen($chunkPacket) . " compressed bytes)");
+			}
 			$this->queueCompressed($chunkPacket);
 			$onCompletion();
 		}finally{

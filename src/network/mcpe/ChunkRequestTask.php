@@ -84,6 +84,10 @@ class ChunkRequestTask extends AsyncTask{
 		$converter = TypeConverter::getInstance($this->mappingProtocol);
 		$payload = ChunkSerializer::serializeFullChunk($chunk, $dimensionId, $converter, $this->tiles);
 
+		if($this->mappingProtocol === ProtocolInfo::PROTOCOL_1_12_0){
+			\GlobalLogger::get()->debug("[Legacy1.12] Serialized chunk $this->chunkX,$this->chunkZ subCount=$subCount payload=" . strlen($payload) . " tiles=" . strlen($this->tiles) . " head=" . bin2hex(substr($payload, 0, 12)) . " tail=" . bin2hex(substr($payload, -8)));
+		}
+
 		$stream = new BinaryStream();
 		PacketBatch::encodePackets($stream, $this->mappingProtocol, [LevelChunkPacket::create(new ChunkPosition($this->chunkX, $this->chunkZ), $dimensionId, $subCount, false, null, $payload)]);
 
