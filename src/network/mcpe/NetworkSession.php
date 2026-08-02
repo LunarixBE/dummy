@@ -654,6 +654,20 @@ class NetworkSession{
 	 */
 	public function addToSendBuffer(string $buffer) : void{
 		$this->sendBuffer[] = $buffer;
+
+		if(PacketIdTranslator::isLegacyProtocol($this->getProtocolId())){
+			//Legacy 1.12 clients frequently negotiate a tiny MTU (~850). Modern PMMP buffers the entire pre-spawn
+			//sequence (StartGame + crafting + creative + player list = ~230KB) into a single batch, which fragments
+			//into ~150 reliable-ordered RakNet pieces and stalls reassembly on the client, so it never requests
+			//chunks. Flush eagerly to keep each batch small and independently deliverable.
+			$total = 0;
+			foreach($this->sendBuffer as $b){
+				$total += strlen($b);
+			}
+			if($total >= 8192){
+				$this->flushGamePacketQueue();
+			}
+		}
 	}
 
 	private function flushGamePacketQueue() : void{
