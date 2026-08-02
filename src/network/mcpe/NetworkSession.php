@@ -41,6 +41,7 @@ use pocketmine\network\mcpe\cache\ChunkCache;
 use pocketmine\network\mcpe\compression\CompressBatchPromise;
 use pocketmine\network\mcpe\compression\Compressor;
 use pocketmine\network\mcpe\compression\DecompressionException;
+use pocketmine\network\mcpe\convert\PacketIdTranslator;
 use pocketmine\network\mcpe\convert\TypeConverter;
 use pocketmine\network\mcpe\encryption\DecryptionException;
 use pocketmine\network\mcpe\encryption\EncryptionContext;
@@ -629,6 +630,18 @@ class NetworkSession{
 		$timings = Timings::getEncodeDataPacketTimings($packet);
 		$timings->startTiming();
 		try{
+			if(PacketIdTranslator::isLegacyProtocol($serializer->getProtocolId())){
+				//DEBUG (legacy 1.12): trace outbound packets and surface encode failures that would otherwise be silent
+				try{
+					$packet->encode($serializer);
+				}catch(\Throwable $e){
+					\GlobalLogger::get()->error("[Legacy1.12] Failed to encode " . get_class($packet) . ": " . $e->getMessage());
+					throw $e;
+				}
+				$buffer = $serializer->getBuffer();
+				\GlobalLogger::get()->debug("[Legacy1.12] Sent " . (new \ReflectionClass($packet))->getShortName() . " (" . strlen($buffer) . " bytes)");
+				return $buffer;
+			}
 			$packet->encode($serializer);
 			return $serializer->getBuffer();
 		}finally{
