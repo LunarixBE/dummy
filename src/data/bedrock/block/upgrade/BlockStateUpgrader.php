@@ -30,11 +30,13 @@ use pocketmine\nbt\tag\StringTag;
 use pocketmine\nbt\tag\Tag;
 use pocketmine\utils\AssumptionFailedError;
 use pocketmine\utils\Utils;
+use function array_keys;
 use function count;
 use function get_class;
 use function is_string;
 use function ksort;
 use function max;
+use function rsort;
 use function sprintf;
 use const SORT_NUMERIC;
 
@@ -71,6 +73,17 @@ final class BlockStateUpgrader{
 		ksort($this->upgradeSchemas[$versionId], SORT_NUMERIC);
 
 		$this->outputVersion = max($this->outputVersion, $schema->getVersionId());
+	}
+
+	/**
+	 * @return int[]
+	 * @phpstan-return list<int>
+	 */
+	public function getSchemaVersionIds() : array{
+		$versionIds = array_keys($this->upgradeSchemas);
+		rsort($versionIds, SORT_NUMERIC);
+
+		return $versionIds;
 	}
 
 	public function upgrade(BlockStateData $blockStateData) : BlockStateData{

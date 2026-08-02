@@ -29,6 +29,7 @@ use pocketmine\data\bedrock\block\convert\BlockObjectToStateSerializer;
 use pocketmine\data\bedrock\block\convert\BlockStateToObjectDeserializer;
 use pocketmine\data\bedrock\block\upgrade\BlockDataUpgrader;
 use pocketmine\data\bedrock\block\upgrade\BlockIdMetaUpgrader;
+use pocketmine\data\bedrock\block\upgrade\BlockStateRepairer;
 use pocketmine\data\bedrock\block\upgrade\BlockStateUpgrader;
 use pocketmine\data\bedrock\block\upgrade\BlockStateUpgradeSchemaUtils;
 use pocketmine\data\bedrock\block\upgrade\LegacyBlockIdToStringIdMap;
@@ -49,6 +50,8 @@ final class GlobalBlockStateHandlers{
 	private static ?BlockStateToObjectDeserializer $blockStateDeserializer = null;
 
 	private static ?BlockDataUpgrader $blockDataUpgrader = null;
+
+	private static ?BlockStateRepairer $blockStateRepairer = null;
 
 	private static ?BlockStateData $unknownBlockStateData = null;
 
@@ -80,6 +83,13 @@ final class GlobalBlockStateHandlers{
 		}
 
 		return self::$blockDataUpgrader;
+	}
+
+	public static function getRepairer() : BlockStateRepairer{
+		return self::$blockStateRepairer ??= new BlockStateRepairer(
+			self::getUpgrader()->getBlockStateUpgrader(),
+			self::getDeserializer()
+		);
 	}
 
 	public static function getUnknownBlockStateData() : BlockStateData{

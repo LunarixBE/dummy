@@ -88,6 +88,16 @@ class Wall extends Transparent{
 		return $this;
 	}
 
+	public function readStateFromWorld() : Block{
+		parent::readStateFromWorld();
+
+		//old worlds (and worlds produced by converters) predate wall connections being stored in the state, so they
+		//have to be derived from the neighbours the same way fences do it
+		$this->recalculateConnections();
+
+		return $this;
+	}
+
 	public function onNearbyBlockChange() : void{
 		if($this->recalculateConnections()){
 			$this->position->getWorld()->setBlock($this->position, $this);

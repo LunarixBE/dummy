@@ -27,6 +27,7 @@ use pocketmine\data\bedrock\block\BlockStateDeserializeException;
 use pocketmine\data\bedrock\block\BlockStateDeserializer;
 use pocketmine\data\bedrock\block\BlockStateSerializer;
 use pocketmine\data\bedrock\block\upgrade\BlockDataUpgrader;
+use pocketmine\data\bedrock\block\upgrade\BlockStateRepairer;
 use pocketmine\world\format\io\exception\CorruptedWorldException;
 use pocketmine\world\format\io\exception\UnsupportedWorldFormatException;
 use pocketmine\world\format\PalettedBlockArray;
@@ -40,6 +41,7 @@ abstract class BaseWorldProvider implements WorldProvider{
 
 	protected BlockStateDeserializer $blockStateDeserializer;
 	protected BlockDataUpgrader $blockDataUpgrader;
+	protected BlockStateRepairer $blockStateRepairer;
 	protected BlockStateSerializer $blockStateSerializer;
 
 	public function __construct(
@@ -53,6 +55,7 @@ abstract class BaseWorldProvider implements WorldProvider{
 		//TODO: this should not rely on singletons
 		$this->blockStateDeserializer = GlobalBlockStateHandlers::getDeserializer();
 		$this->blockDataUpgrader = GlobalBlockStateHandlers::getUpgrader();
+		$this->blockStateRepairer = GlobalBlockStateHandlers::getRepairer();
 		$this->blockStateSerializer = GlobalBlockStateHandlers::getSerializer();
 
 		$this->worldData = $this->loadLevelData();

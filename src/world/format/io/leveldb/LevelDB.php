@@ -209,11 +209,19 @@ class LevelDB extends BaseWorldProvider implements WritableWorldProvider{
 			}
 			try{
 				$palette[] = $this->blockStateDeserializer->deserialize($blockStateData);
-			}catch(UnsupportedBlockStateException $e){
-				$blockDecodeErrors[] = "Palette offset $i / " . $e->getMessage();
-				$palette[] = $this->blockStateDeserializer->deserialize(GlobalBlockStateHandlers::getUnknownBlockStateData());
 			}catch(BlockStateDeserializeException $e){
-				$blockDecodeErrors[] = "Palette offset $i / Deserialize error: " . $e->getMessage() . ", NBT: " . $blockStateNbt->toString();
+				//world converters like to stamp modern versions onto states that still use an older property layout,
+				//which makes the upgrader skip the schemas those states are waiting for - replaying the upgrade with a
+				//lowered stamp recovers them
+				$repairedStateData = $this->blockStateRepairer->repair($blockStateData);
+				if($repairedStateData !== null){
+					$palette[] = $this->blockStateDeserializer->deserialize($repairedStateData);
+					continue;
+				}
+
+				$blockDecodeErrors[] = $e instanceof UnsupportedBlockStateException ?
+					"Palette offset $i / " . $e->getMessage() :
+					"Palette offset $i / Deserialize error: " . $e->getMessage() . ", NBT: " . $blockStateNbt->toString();
 				$palette[] = $this->blockStateDeserializer->deserialize(GlobalBlockStateHandlers::getUnknownBlockStateData());
 			}
 		}
