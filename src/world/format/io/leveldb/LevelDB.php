@@ -180,7 +180,7 @@ class LevelDB extends BaseWorldProvider implements WritableWorldProvider{
 				if($susLength !== 1){ //make sure the data isn't complete garbage
 					throw new CorruptedChunkException("CustomItemAPI borked 0 bpb palette should always have a length of 1");
 				}
-				$logger->error("Unexpected palette size for 0 bpb palette");
+				$logger->debug("Unexpected palette size for 0 bpb palette");
 			}
 		}else{
 			$paletteSize = $stream->getLInt();
@@ -227,7 +227,7 @@ class LevelDB extends BaseWorldProvider implements WritableWorldProvider{
 		}
 
 		if(count($blockDecodeErrors) > 0){
-			$logger->error("Errors decoding blocks:\n - " . implode("\n - ", $blockDecodeErrors));
+			$logger->debug("Errors decoding blocks:\n - " . implode("\n - ", $blockDecodeErrors));
 		}
 
 		//TODO: exceptions
@@ -324,7 +324,7 @@ class LevelDB extends BaseWorldProvider implements WritableWorldProvider{
 					$result[$nextIndex++] = $decoded;
 				}elseif($stream->feof()){
 					//not enough padding biome arrays for the given version - this is non-critical since we discard the excess anyway, but this should be logged
-					$logger->error("Wrong number of 3D biome palettes for this chunk version: expected $expectedCount, but got " . ($i + 1) . " - this is not a problem, but may indicate a corrupted chunk");
+					$logger->debug("Wrong number of 3D biome palettes for this chunk version: expected $expectedCount, but got " . ($i + 1) . " - this is not a problem, but may indicate a corrupted chunk");
 					break;
 				}
 			}catch(BinaryDataException $e){
@@ -333,7 +333,7 @@ class LevelDB extends BaseWorldProvider implements WritableWorldProvider{
 		}
 		if(!$stream->feof()){
 			//maybe bad output produced by a third-party conversion tool like Chunker
-			$logger->error("Unexpected trailing data after 3D biomes data");
+			$logger->debug("Unexpected trailing data after 3D biomes data");
 		}
 
 		return $result;
@@ -397,7 +397,7 @@ class LevelDB extends BaseWorldProvider implements WritableWorldProvider{
 			}catch(BlockStateDeserializeException $e){
 				//TODO: we could preserve this in case it's supported in the future, but this was historically only
 				//used for grass anyway, so we probably don't need to care
-				$logger->error("Failed to upgrade legacy extra block: " . $e->getMessage() . " ($blockId:$blockData)");
+				$logger->debug("Failed to upgrade legacy extra block: " . $e->getMessage() . " ($blockId:$blockData)");
 				continue;
 			}
 			//assume this won't throw
@@ -457,7 +457,7 @@ class LevelDB extends BaseWorldProvider implements WritableWorldProvider{
 			throw new CorruptedChunkException($e->getMessage(), 0, $e);
 		}
 		if(!$binaryStream->feof()){
-			$logger->error("Unexpected trailing data in legacy terrain data");
+			$logger->debug("Unexpected trailing data in legacy terrain data");
 		}
 
 		$subChunks = [];
@@ -494,10 +494,10 @@ class LevelDB extends BaseWorldProvider implements WritableWorldProvider{
 			try{
 				$binaryStream->get(4096); //legacy light info, discard it
 				if(!$binaryStream->feof()){
-					$logger->error("Unexpected trailing data in legacy subchunk data");
+					$logger->debug("Unexpected trailing data in legacy subchunk data");
 				}
 			}catch(BinaryDataException $e){
-				$logger->error("Failed to read legacy subchunk light info: " . $e->getMessage());
+				$logger->debug("Failed to read legacy subchunk light info: " . $e->getMessage());
 			}
 		}
 
@@ -616,7 +616,7 @@ class LevelDB extends BaseWorldProvider implements WritableWorldProvider{
 				$binaryStream->get(512); //heightmap, discard it
 				$biomes3d = ChunkUtils::extrapolate3DBiomes($binaryStream->get(256)); //never throws
 				if(!$binaryStream->feof()){
-					$logger->error("Unexpected trailing data after 2D biome data");
+					$logger->debug("Unexpected trailing data after 2D biome data");
 				}
 			}catch(BinaryDataException $e){
 				throw new CorruptedChunkException($e->getMessage(), 0, $e);
@@ -634,7 +634,7 @@ class LevelDB extends BaseWorldProvider implements WritableWorldProvider{
 				throw new CorruptedChunkException($e->getMessage(), 0, $e);
 			}
 		}else{
-			$logger->error("Missing biome data, using default ocean biome");
+			$logger->debug("Missing biome data, using default ocean biome");
 			for($i = Chunk::MIN_SUBCHUNK_INDEX; $i <= Chunk::MAX_SUBCHUNK_INDEX; ++$i){
 				$biomeArrays[$i] = new PalettedBlockArray(BiomeIds::OCEAN); //polyfill
 			}
