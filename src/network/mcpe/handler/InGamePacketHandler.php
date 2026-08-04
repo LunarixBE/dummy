@@ -188,6 +188,22 @@ class InGamePacketHandler extends PacketHandler{
 			}
 		}
 
+		$hasMoved = $this->lastPlayerAuthInputPosition === null || !$this->lastPlayerAuthInputPosition->equals($rawPos);
+		$newPos = $rawPos->subtract(0, 1.62, 0)->round(4);
+
+		if($this->forceMoveSync){
+			$curPos = $this->player->getLocation();
+
+			if($newPos->distanceSquared($curPos) > 1){  //Tolerate up to 1 block to avoid problems with client-sided physics when spawning in blocks
+				$this->session->getLogger()->debug("Got outdated pre-teleport movement, received " . $newPos . ", expected " . $curPos);
+				//Still getting movements from before teleport, ignore them
+				return true;
+			}
+
+			// Once we get a movement within a reasonable distance, treat it as a teleport ACK and remove position lock
+			$this->forceMoveSync = false;
+		}
+
 		if($rawYaw !== $this->lastPlayerAuthInputYaw || $rawPitch !== $this->lastPlayerAuthInputPitch){
 			$this->lastPlayerAuthInputYaw = $rawYaw;
 			$this->lastPlayerAuthInputPitch = $rawPitch;
@@ -199,22 +215,6 @@ class InGamePacketHandler extends PacketHandler{
 			}
 
 			$this->player->setRotation($yaw, $pitch);
-		}
-
-		$hasMoved = $this->lastPlayerAuthInputPosition === null || !$this->lastPlayerAuthInputPosition->equals($rawPos);
-		$newPos = $rawPos->subtract(0, 1.62, 0)->round(4);
-
-		if($this->forceMoveSync && $hasMoved){
-			$curPos = $this->player->getLocation();
-
-			if($newPos->distanceSquared($curPos) > 1){  //Tolerate up to 1 block to avoid problems with client-sided physics when spawning in blocks
-				$this->session->getLogger()->debug("Got outdated pre-teleport movement, received " . $newPos . ", expected " . $curPos);
-				//Still getting movements from before teleport, ignore them
-				return true;
-			}
-
-			// Once we get a movement within a reasonable distance, treat it as a teleport ACK and remove position lock
-			$this->forceMoveSync = false;
 		}
 
 		$inputFlags = $packet->getInputFlags();
