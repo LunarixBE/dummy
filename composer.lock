@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "b612cf11b6157f47f99519a3b2fe3c15",
+    "content-hash": "27080faeb9a4ea233e1b0b3ba98792f7",
     "packages": [
         {
             "name": "adhocore/json-comment",
@@ -201,55 +201,45 @@
         },
         {
             "name": "pocketmine/bedrock-block-upgrade-schema",
-            "version": "5.2.0",
+            "version": "1.26.40",
             "source": {
                 "type": "git",
-                "url": "https://github.com/pmmp/BedrockBlockUpgradeSchema.git",
-                "reference": "5d7889c9a1cdf9e3cd814d2a104ad69b75116ec7"
+                "url": "https://github.com/ZyroNetworkMC/BedrockBlockUpgradeSchema.git",
+                "reference": "abcfb27df7a60d8bf889ba3ddc62cd78774e55ab"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/pmmp/BedrockBlockUpgradeSchema/zipball/5d7889c9a1cdf9e3cd814d2a104ad69b75116ec7",
-                "reference": "5d7889c9a1cdf9e3cd814d2a104ad69b75116ec7",
+                "url": "https://api.github.com/repos/ZyroNetworkMC/BedrockBlockUpgradeSchema/zipball/abcfb27df7a60d8bf889ba3ddc62cd78774e55ab",
+                "reference": "abcfb27df7a60d8bf889ba3ddc62cd78774e55ab",
                 "shasum": ""
             },
             "type": "library",
-            "notification-url": "https://packagist.org/downloads/",
             "license": [
                 "CC0-1.0"
             ],
             "description": "Schemas describing how to upgrade saved block data in older Minecraft: Bedrock Edition world saves",
-            "support": {
-                "issues": "https://github.com/pmmp/BedrockBlockUpgradeSchema/issues",
-                "source": "https://github.com/pmmp/BedrockBlockUpgradeSchema/tree/5.2.0"
-            },
-            "time": "2025-10-02T13:22:10+00:00"
+            "time": "2026-07-13T12:44:32+00:00"
         },
         {
             "name": "pocketmine/bedrock-item-upgrade-schema",
-            "version": "1.17.0",
+            "version": "1.26.40",
             "source": {
                 "type": "git",
-                "url": "https://github.com/pmmp/BedrockItemUpgradeSchema.git",
-                "reference": "e19685d2e7e76eb7446115c556df34e5d627d072"
+                "url": "https://github.com/ZyroNetworkMC/BedrockItemUpgradeSchema.git",
+                "reference": "d897d294692b1728970591c7a3e35318ac729820"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/pmmp/BedrockItemUpgradeSchema/zipball/e19685d2e7e76eb7446115c556df34e5d627d072",
-                "reference": "e19685d2e7e76eb7446115c556df34e5d627d072",
+                "url": "https://api.github.com/repos/ZyroNetworkMC/BedrockItemUpgradeSchema/zipball/d897d294692b1728970591c7a3e35318ac729820",
+                "reference": "d897d294692b1728970591c7a3e35318ac729820",
                 "shasum": ""
             },
             "type": "library",
-            "notification-url": "https://packagist.org/downloads/",
             "license": [
                 "CC0-1.0"
             ],
             "description": "JSON schemas for upgrading items found in older Minecraft: Bedrock world saves",
-            "support": {
-                "issues": "https://github.com/pmmp/BedrockItemUpgradeSchema/issues",
-                "source": "https://github.com/pmmp/BedrockItemUpgradeSchema/tree/1.17.0"
-            },
-            "time": "2026-05-06T13:12:04+00:00"
+            "time": "2026-07-13T12:44:45+00:00"
         },
         {
             "name": "pocketmine/binaryutils",
@@ -3673,5 +3663,5 @@
         "php": ">=8.1"
     },
     "platform-dev": {},
-    "plugin-api-version": "2.6.0"
+    "plugin-api-version": "2.9.0"
 }
