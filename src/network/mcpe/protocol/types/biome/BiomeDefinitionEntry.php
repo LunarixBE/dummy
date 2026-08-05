@@ -46,8 +46,11 @@ final class BiomeDefinitionEntry{
 		private Color $mapWaterColor,
 		private bool $rain,
 		private ?array $tags,
-		private ?BiomeDefinitionChunkGenData $chunkGenData = null
+		private ?BiomeDefinitionChunkGenData $chunkGenData = null,
+		private float $foliageSnow = 0.0
 	){}
+
+	public function getFoliageSnow() : float{ return $this->foliageSnow; }
 
 	public function getBiomeName() : string{ return $this->biomeName; }
 

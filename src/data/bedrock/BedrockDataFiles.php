@@ -33,8 +33,19 @@ final class BedrockDataFiles{
 	public const BANNER_PATTERNS_JSON = BEDROCK_DATA_PATH . '/banner_patterns.json';
 	public const BIOME_DEFINITIONS_JSON = BEDROCK_DATA_PATH . '/biome_definitions.json';
 	public const BIOME_DEFINITIONS_NBT = BEDROCK_DATA_PATH . '/biome_definitions.nbt';
+	public const BIOME_DEFINITIONS_1_26_40_NBT = BEDROCK_DATA_PATH . '/biome_definitions-1.26.40.nbt';
 	public const BIOME_DEFINITIONS_FULL_NBT = BEDROCK_DATA_PATH . '/biome_definitions_full.nbt';
 	public const BIOME_ID_MAP_JSON = BEDROCK_DATA_PATH . '/biome_id_map.json';
+	public const BIOMES_JSON = BEDROCK_DATA_PATH . '/biomes.json';
+	public const BLOCK_PALETTE_NBT = BEDROCK_DATA_PATH . '/block_palette.nbt';
+	public const BLOCK_TAGS_JSON = BEDROCK_DATA_PATH . '/block_tags.json';
+	public const CAMERA_AIM_ASSIST_PRESETS_NBT = BEDROCK_DATA_PATH . '/camera_aim_assist_presets.nbt';
+	public const CAMERA_PRESETS_NBT = BEDROCK_DATA_PATH . '/camera_presets.nbt';
+	public const CREATIVE_ITEMS_JSON = BEDROCK_DATA_PATH . '/creative_items.json';
+	public const ITEM_COMPONENTS_NBT = BEDROCK_DATA_PATH . '/item_components.nbt';
+	public const ITEM_PALETTE_JSON = BEDROCK_DATA_PATH . '/item_palette.json';
+	public const RECIPES_JSON = BEDROCK_DATA_PATH . '/recipes.json';
+	public const TRIM_DATA_JSON = BEDROCK_DATA_PATH . '/trim_data.json';
 	public const BLOCK_ID_TO_ITEM_ID_MAP_1_20_0_JSON = BEDROCK_DATA_PATH . '/block_id_to_item_id_map-1.20.0.json';
 	public const BLOCK_ID_TO_ITEM_ID_MAP_1_20_10_JSON = BEDROCK_DATA_PATH . '/block_id_to_item_id_map-1.20.10.json';
 	public const BLOCK_ID_TO_ITEM_ID_MAP_1_20_40_JSON = BEDROCK_DATA_PATH . '/block_id_to_item_id_map-1.20.40.json';
@@ -87,6 +98,7 @@ final class BedrockDataFiles{
 	public const ENTITY_ID_MAP_JSON = BEDROCK_DATA_PATH . '/entity_id_map.json';
 	public const ENTITY_IDENTIFIERS_NBT = BEDROCK_DATA_PATH . '/entity_identifiers.nbt';
 	public const ENTITY_IDENTIFIERS_1_16_100_NBT = BEDROCK_DATA_PATH . '/entity_identifiers-1.16.100.nbt';
+	public const ENTITY_IDENTIFIERS_1_26_40_NBT = BEDROCK_DATA_PATH . '/entity_identifiers-1.26.40.nbt';
 	public const ENUMS = BEDROCK_DATA_PATH . '/enums';
 	public const ENUMS_PY = BEDROCK_DATA_PATH . '/enums.py';
 	public const ITEM_TAGS_1_20_0_JSON = BEDROCK_DATA_PATH . '/item_tags-1.20.0.json';

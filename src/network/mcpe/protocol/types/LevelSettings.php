@@ -132,7 +132,8 @@ final class LevelSettings{
 			$this->exportedFromEditorMode = $in->getBool();
 		}
 		$this->time = $in->getVarInt();
-		$this->eduEditionOffer = $in->getVarInt();
+		$is2640 = $in->getProtocolId() >= ProtocolInfo::PROTOCOL_1_26_40;
+		$this->eduEditionOffer = $is2640 ? $in->getUnsignedVarInt() : $in->getVarInt();
 		$this->hasEduFeaturesEnabled = $in->getBool();
 		$this->eduProductUUID = $in->getString();
 		$this->rainLevel = $in->getLFloat();
@@ -152,7 +153,7 @@ final class LevelSettings{
 
 		$this->hasBonusChestEnabled = $in->getBool();
 		$this->hasStartWithMapEnabled = $in->getBool();
-		$this->defaultPlayerPermission = $in->getVarInt();
+		$this->defaultPlayerPermission = $is2640 ? $in->getByte() : $in->getVarInt();
 		$this->serverChunkTickRadius = $in->getLInt();
 		$this->hasLockedBehaviorPack = $in->getBool();
 		$this->hasLockedResourcePack = $in->getBool();
@@ -221,7 +222,8 @@ final class LevelSettings{
 			$out->putBool($this->exportedFromEditorMode);
 		}
 		$out->putVarInt($this->time);
-		$out->putVarInt($this->eduEditionOffer);
+		$is2640 = $out->getProtocolId() >= ProtocolInfo::PROTOCOL_1_26_40;
+		$is2640 ? $out->putUnsignedVarInt($this->eduEditionOffer) : $out->putVarInt($this->eduEditionOffer);
 		$out->putBool($this->hasEduFeaturesEnabled);
 		$out->putString($this->eduProductUUID);
 		$out->putLFloat($this->rainLevel);
@@ -241,7 +243,7 @@ final class LevelSettings{
 
 		$out->putBool($this->hasBonusChestEnabled);
 		$out->putBool($this->hasStartWithMapEnabled);
-		$out->putVarInt($this->defaultPlayerPermission);
+		$is2640 ? $out->putByte($this->defaultPlayerPermission) : $out->putVarInt($this->defaultPlayerPermission);
 		$out->putLInt($this->serverChunkTickRadius);
 		$out->putBool($this->hasLockedBehaviorPack);
 		$out->putBool($this->hasLockedResourcePack);

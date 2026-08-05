@@ -77,7 +77,12 @@ class PlayerUpdateEntityOverridesPacket extends DataPacket implements Clientboun
 	protected function decodePayload(PacketSerializer $in) : void{
 		$this->actorRuntimeId = $in->getActorRuntimeId();
 		$this->propertyIndex = $in->getUnsignedVarInt();
-		$this->updateType = OverrideUpdateType::fromPacket($in->getByte());
+		if($in->getProtocolId() >= ProtocolInfo::PROTOCOL_1_26_40){
+			$this->updateType = OverrideUpdateType::fromPacket($in->getUnsignedVarInt());
+			$in->getString();
+		}else{
+			$this->updateType = OverrideUpdateType::fromPacket($in->getByte());
+		}
 		if($this->updateType === OverrideUpdateType::SET_INT_OVERRIDE){
 			$this->intOverrideValue = $in->getLInt();
 		}elseif($this->updateType === OverrideUpdateType::SET_FLOAT_OVERRIDE){
@@ -88,7 +93,12 @@ class PlayerUpdateEntityOverridesPacket extends DataPacket implements Clientboun
 	protected function encodePayload(PacketSerializer $out) : void{
 		$out->putActorRuntimeId($this->actorRuntimeId);
 		$out->putUnsignedVarInt($this->propertyIndex);
-		$out->putByte($this->updateType->value);
+		if($out->getProtocolId() >= ProtocolInfo::PROTOCOL_1_26_40){
+			$out->putUnsignedVarInt($this->updateType->value);
+			$out->putString($this->updateType->getId());
+		}else{
+			$out->putByte($this->updateType->value);
+		}
 		if($this->updateType === OverrideUpdateType::SET_INT_OVERRIDE){
 			if($this->intOverrideValue === null){ // this should never be the case
 				throw new \LogicException("PlayerUpdateEntityOverridesPacket with type SET_INT_OVERRIDE requires intOverrideValue to be provided");

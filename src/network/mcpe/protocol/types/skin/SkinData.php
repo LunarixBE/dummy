@@ -31,6 +31,15 @@ class SkinData{
 	public const ARM_SIZE_SLIM = "slim";
 	public const ARM_SIZE_WIDE = "wide";
 
+	/** >= PROTOCOL_1_26_40, sent as a byte; the string form above stays canonical */
+	public const ARM_SIZE_ID_SLIM = 0;
+	public const ARM_SIZE_ID_WIDE = 1;
+
+	/** >= PROTOCOL_1_26_40 */
+	public const TRUSTED_SKIN_FLAG_UNSET = "unset";
+	public const TRUSTED_SKIN_FLAG_FALSE = "false";
+	public const TRUSTED_SKIN_FLAG_TRUE = "true";
+
 	private SkinImage $capeImage;
 	private string $fullSkinId;
 
@@ -60,7 +69,9 @@ class SkinData{
 		private bool $persona = false,
 		private bool $personaCapeOnClassic = false,
 		private bool $isPrimaryUser = true,
-		private bool $override = true
+		private bool $override = true,
+		private string $trustedSkinFlag = self::TRUSTED_SKIN_FLAG_UNSET,
+		private string $profileHash = ""
 	){
 		$this->capeImage = $capeImage ?? new SkinImage(0, 0, "");
 		//this has to be unique or the client will do stupid things
@@ -147,6 +158,12 @@ class SkinData{
 	public function isPrimaryUser() : bool{ return $this->isPrimaryUser; }
 
 	public function isOverride() : bool{ return $this->override; }
+
+	/** >= PROTOCOL_1_26_40 */
+	public function getTrustedSkinFlag() : string{ return $this->trustedSkinFlag; }
+
+	/** >= PROTOCOL_1_26_40 */
+	public function getProfileHash() : string{ return $this->profileHash; }
 
 	public function isVerified() : bool{
 		return $this->isVerified;

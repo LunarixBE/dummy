@@ -53,6 +53,10 @@ final class BiomeDefinitionData{
 		private ?BiomeDefinitionChunkGenData $chunkGenData = null
 	){}
 
+	public function getFoliageSnow() : float{ return $this->foliageSnow; }
+
+	public function setFoliageSnow(float $foliageSnow) : void{ $this->foliageSnow = $foliageSnow; }
+
 	public function getNameIndex() : int{ return $this->nameIndex; }
 
 	public function getId() : int{ return $this->id; }

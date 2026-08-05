@@ -35,6 +35,8 @@ class PlaySoundPacket extends DataPacket implements ClientboundPacket{
 	public float $z;
 	public float $volume;
 	public float $pitch;
+	/** >= PROTOCOL_1_26_40 */
+	public int $loopCount = 0;
 	public ?int $serverSoundHandle = null;
 
 	/**
@@ -60,6 +62,9 @@ class PlaySoundPacket extends DataPacket implements ClientboundPacket{
 		$this->z = $blockPosition->getZ() / 8;
 		$this->volume = $in->getLFloat();
 		$this->pitch = $in->getLFloat();
+		if($in->getProtocolId() >= ProtocolInfo::PROTOCOL_1_26_40){
+			$this->loopCount = $in->getVarInt();
+		}
 		if($in->getProtocolId() >= ProtocolInfo::PROTOCOL_1_26_20){
 			$this->serverSoundHandle = $in->readOptional($in->getLLong(...));
 		}
@@ -70,6 +75,9 @@ class PlaySoundPacket extends DataPacket implements ClientboundPacket{
 		$out->putBlockPosition(new BlockPosition((int) ($this->x * 8), (int) ($this->y * 8), (int) ($this->z * 8)), $out->getProtocolId() >= ProtocolInfo::PROTOCOL_1_26_10);
 		$out->putLFloat($this->volume);
 		$out->putLFloat($this->pitch);
+		if($out->getProtocolId() >= ProtocolInfo::PROTOCOL_1_26_40){
+			$out->putVarInt($this->loopCount);
+		}
 		if($out->getProtocolId() >= ProtocolInfo::PROTOCOL_1_26_20){
 			$out->writeOptional($this->serverSoundHandle, $out->putLLong(...));
 		}

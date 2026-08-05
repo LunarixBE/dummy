@@ -23,35 +23,30 @@ declare(strict_types=1);
 
 namespace pocketmine\network\mcpe\protocol\types;
 
-use pocketmine\network\mcpe\protocol\ProtocolInfo;
 use pocketmine\network\mcpe\protocol\serializer\PacketSerializer;
-use Ramsey\Uuid\Uuid;
 use Ramsey\Uuid\UuidInterface;
 
+/**
+ * >= PROTOCOL_1_26_40 optional TransferPacket payload
+ */
 final class GatheringJoinInfo{
-	private UuidInterface $targetId;
 
 	public function __construct(
-		private string $experienceId,
+		private UuidInterface $experienceId,
 		private string $experienceName,
-		private string $experienceWorldId,
+		private UuidInterface $experienceWorldId,
 		private string $experienceWorldName,
 		private string $creatorId,
-		private string $storeId,
-		?UuidInterface $targetId = null,
-		private string $scenarioId = "",
-		private string $serverId = "",
-		private string $storeName = "",
-		private bool $presenceConfiguration = false
-	){
-		$this->targetId = $targetId ?? Uuid::uuid4();
-	}
+		private UuidInterface $targetId,
+		private string $scenarioId,
+		private string $serverId,
+	){}
 
-	public function getExperienceId() : string{ return $this->experienceId; }
+	public function getExperienceId() : UuidInterface{ return $this->experienceId; }
 
 	public function getExperienceName() : string{ return $this->experienceName; }
 
-	public function getExperienceWorldId() : string{ return $this->experienceWorldId; }
+	public function getExperienceWorldId() : UuidInterface{ return $this->experienceWorldId; }
 
 	public function getExperienceWorldName() : string{ return $this->experienceWorldName; }
 
@@ -63,59 +58,27 @@ final class GatheringJoinInfo{
 
 	public function getServerId() : string{ return $this->serverId; }
 
-	public function getStoreId() : string{ return $this->storeId; }
-
-	public function getStoreName() : string{ return $this->storeName; }
-
-	public function isPresenceConfiguration() : bool{ return $this->presenceConfiguration; }
-
-	public static function read(PacketSerializer $in, ?int $protocolId = null) : self{
-		$protocolId ??= $in->getProtocolId();
-		if($protocolId >= ProtocolInfo::PROTOCOL_1_26_10){
-			$experienceId = $in->getString();
-			$experienceName = $in->getString();
-			$experienceWorldId = $in->getString();
-			$experienceWorldName = $in->getString();
-			$creatorId = $in->getString();
-			$targetId = $in->getUUID();
-			$scenarioId = $in->getString();
-			$serverId = $in->getString();
-			$storeId = $in->getString();
-			$storeName = $in->getString();
-		}
-
-		$presenceConfiguration = $in->getBool();
-
+	public static function read(PacketSerializer $in) : self{
 		return new self(
-			$experienceId ?? "",
-			$experienceName ?? "",
-			$experienceWorldId ?? "",
-			$experienceWorldName ?? "",
-			$creatorId ?? "",
-			$storeId ?? "",
-			$targetId ?? null,
-			$scenarioId ?? "",
-			$serverId ?? "",
-			$storeName ?? "",
-			$presenceConfiguration
+			$in->getUUID(),
+			$in->getString(),
+			$in->getUUID(),
+			$in->getString(),
+			$in->getString(),
+			$in->getUUID(),
+			$in->getString(),
+			$in->getString(),
 		);
 	}
 
-	public function write(PacketSerializer $out, ?int $protocolId = null) : void{
-		$protocolId ??= $out->getProtocolId();
-		if($protocolId >= ProtocolInfo::PROTOCOL_1_26_10){
-			$out->putString($this->experienceId);
-			$out->putString($this->experienceName);
-			$out->putString($this->experienceWorldId);
-			$out->putString($this->experienceWorldName);
-			$out->putString($this->creatorId);
-			$out->putUUID($this->targetId);
-			$out->putString($this->scenarioId);
-			$out->putString($this->serverId);
-			$out->putString($this->storeId);
-			$out->putString($this->storeName);
-		}
-
-		$out->putBool($this->presenceConfiguration);
+	public function write(PacketSerializer $out) : void{
+		$out->putUUID($this->experienceId);
+		$out->putString($this->experienceName);
+		$out->putUUID($this->experienceWorldId);
+		$out->putString($this->experienceWorldName);
+		$out->putString($this->creatorId);
+		$out->putUUID($this->targetId);
+		$out->putString($this->scenarioId);
+		$out->putString($this->serverId);
 	}
 }

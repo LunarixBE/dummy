@@ -42,8 +42,16 @@ final class IntGameRule extends GameRule{
 		return $this->value;
 	}
 
+	/** >= PROTOCOL_1_26_40 dropped the StartGame special case - int rules are LE ints everywhere */
+	private static function isVarInt(PacketSerializer $stream, bool $isStartGame) : bool{
+		if($stream->getProtocolId() >= ProtocolInfo::PROTOCOL_1_26_40){
+			return false;
+		}
+		return $isStartGame || $stream->getProtocolId() < ProtocolInfo::PROTOCOL_1_21_111;
+	}
+
 	public function encode(PacketSerializer $out, bool $isStartGame = false) : void{
-		if($isStartGame || $out->getProtocolId() < ProtocolInfo::PROTOCOL_1_21_111){
+		if(self::isVarInt($out, $isStartGame)){
 			$out->putUnsignedVarInt($this->value);
 		}else{
 			$out->putLInt($this->value);
@@ -51,6 +59,6 @@ final class IntGameRule extends GameRule{
 	}
 
 	public static function decode(PacketSerializer $in, bool $isPlayerModifiable, bool $isStartGame = false) : self{
-		return new self(($isStartGame || $in->getProtocolId() < ProtocolInfo::PROTOCOL_1_21_111) ? $in->getUnsignedVarInt() : $in->getLInt(), $isPlayerModifiable);
+		return new self(self::isVarInt($in, $isStartGame) ? $in->getUnsignedVarInt() : $in->getLInt(), $isPlayerModifiable);
 	}
 }

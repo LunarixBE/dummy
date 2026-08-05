@@ -31,6 +31,7 @@ use pocketmine\network\mcpe\protocol\types\MapDecoration;
 use pocketmine\network\mcpe\protocol\types\MapImage;
 use pocketmine\network\mcpe\protocol\types\MapTrackedObject;
 use pocketmine\utils\Binary;
+use function array_chunk;
 use function count;
 
 class ClientboundMapItemDataPacket extends DataPacket implements ClientboundPacket{
@@ -48,7 +49,7 @@ class ClientboundMapItemDataPacket extends DataPacket implements ClientboundPack
 
 	/** @var int[] */
 	public array $parentMapIds = [];
-	public int $scale;
+	public int $scale = 0;
 
 	/** @var MapTrackedObject[] */
 	public array $trackedEntities = [];
@@ -60,6 +61,11 @@ class ClientboundMapItemDataPacket extends DataPacket implements ClientboundPack
 	public ?MapImage $colors = null;
 
 	protected function decodePayload(PacketSerializer $in) : void{
+		if($in->getProtocolId() >= ProtocolInfo::PROTOCOL_1_26_40){
+			$this->decodePayload1_26_40($in);
+			return;
+		}
+
 		$this->mapId = $in->getActorUniqueId();
 		$this->type = $in->getUnsignedVarInt();
 		$this->dimensionId = $in->getByte();
@@ -119,7 +125,131 @@ class ClientboundMapItemDataPacket extends DataPacket implements ClientboundPack
 		}
 	}
 
+	/**
+	 * >= PROTOCOL_1_26_40 dropped the bitflags - every section is an independent optional. The flags are rebuilt from
+	 * which sections are present.
+	 */
+	private function decodePayload1_26_40(PacketSerializer $in) : void{
+		$this->mapId = $in->getActorUniqueId();
+		$this->dimensionId = $in->getByte();
+		$this->isLocked = $in->getBool();
+		$this->origin = $in->getSignedBlockPosition();
+		$this->type = 0;
+
+		$parentMapIds = $in->readOptional(function() use ($in) : array{
+			$ids = [];
+			for($i = 0, $count = $in->getUnsignedVarInt(); $i < $count; ++$i){
+				$ids[] = $in->getActorUniqueId();
+			}
+			return $ids;
+		});
+		if($parentMapIds !== null){
+			$this->parentMapIds = $parentMapIds;
+			$this->type |= self::BITFLAG_MAP_CREATION;
+		}
+
+		$this->scale = $in->readOptional(fn() => $in->getByte()) ?? 0;
+
+		$this->trackedEntities = $in->readOptional(function() use ($in) : array{
+			$objects = [];
+			for($i = 0, $count = $in->getUnsignedVarInt(); $i < $count; ++$i){
+				$objects[] = MapTrackedObject::read($in);
+			}
+			return $objects;
+		}) ?? [];
+
+		$decorations = $in->readOptional(function() use ($in) : array{
+			$decorations = [];
+			for($i = 0, $count = $in->getUnsignedVarInt(); $i < $count; ++$i){
+				$icon = $in->getByte();
+				$rotation = $in->getByte();
+				$xOffset = $in->getByte();
+				$yOffset = $in->getByte();
+				$label = $in->getString();
+				$color = Color::fromRGBA(Binary::flipIntEndianness($in->getLInt()));
+				$decorations[] = new MapDecoration($icon, $rotation, $xOffset, $yOffset, $label, $color);
+			}
+			return $decorations;
+		});
+		if($decorations !== null){
+			$this->decorations = $decorations;
+			$this->type |= self::BITFLAG_DECORATION_UPDATE;
+		}
+
+		$width = $in->readOptional(fn() => $in->getVarInt());
+		$height = $in->readOptional(fn() => $in->getVarInt());
+		$this->xOffset = $in->readOptional(fn() => $in->getVarInt()) ?? 0;
+		$this->yOffset = $in->readOptional(fn() => $in->getVarInt()) ?? 0;
+
+		$pixels = $in->readOptional(function() use ($in) : array{
+			$pixels = [];
+			for($i = 0, $count = $in->getUnsignedVarInt(); $i < $count; ++$i){
+				$pixels[] = Color::fromRGBA(Binary::flipIntEndianness($in->getLInt()));
+			}
+			return $pixels;
+		});
+		if($pixels !== null && $width !== null && $height !== null && $width > 0 && count($pixels) === $width * $height){
+			$this->colors = new MapImage(array_chunk($pixels, $width));
+			$this->type |= self::BITFLAG_TEXTURE_UPDATE;
+		}
+	}
+
+	private function encodePayload1_26_40(PacketSerializer $out) : void{
+		$out->putActorUniqueId($this->mapId);
+		$out->putByte($this->dimensionId);
+		$out->putBool($this->isLocked);
+		$out->putSignedBlockPosition($this->origin);
+
+		$out->writeOptional(count($this->parentMapIds) > 0 ? $this->parentMapIds : null, function(array $parentMapIds) use ($out) : void{
+			$out->putUnsignedVarInt(count($parentMapIds));
+			foreach($parentMapIds as $parentMapId){
+				$out->putActorUniqueId($parentMapId);
+			}
+		});
+
+		$out->writeOptional($this->scale, fn(int $scale) => $out->putByte($scale));
+
+		$out->writeOptional(count($this->trackedEntities) > 0 ? $this->trackedEntities : null, function(array $trackedEntities) use ($out) : void{
+			$out->putUnsignedVarInt(count($trackedEntities));
+			foreach($trackedEntities as $object){
+				$object->write($out);
+			}
+		});
+
+		$out->writeOptional(count($this->decorations) > 0 ? $this->decorations : null, function(array $decorations) use ($out) : void{
+			$out->putUnsignedVarInt(count($decorations));
+			foreach($decorations as $decoration){
+				$out->putByte($decoration->getIcon());
+				$out->putByte($decoration->getRotation());
+				$out->putByte($decoration->getXOffset());
+				$out->putByte($decoration->getYOffset());
+				$out->putString($decoration->getLabel());
+				$out->putLInt(Binary::flipIntEndianness($decoration->getColor()->toRGBA()));
+			}
+		});
+
+		$colors = $this->colors;
+		$out->writeOptional($colors?->getWidth(), fn(int $v) => $out->putVarInt($v));
+		$out->writeOptional($colors?->getHeight(), fn(int $v) => $out->putVarInt($v));
+		$out->writeOptional($colors !== null ? $this->xOffset : null, fn(int $v) => $out->putVarInt($v));
+		$out->writeOptional($colors !== null ? $this->yOffset : null, fn(int $v) => $out->putVarInt($v));
+
+		$out->writeOptional($colors, function(MapImage $colors) use ($out) : void{
+			$out->putUnsignedVarInt($colors->getWidth() * $colors->getHeight());
+			foreach($colors->getPixels() as $row){
+				foreach($row as $pixel){
+					$out->putLInt(Binary::flipIntEndianness($pixel->toRGBA()));
+				}
+			}
+		});
+	}
+
 	protected function encodePayload(PacketSerializer $out) : void{
+		if($out->getProtocolId() >= ProtocolInfo::PROTOCOL_1_26_40){
+			$this->encodePayload1_26_40($out);
+			return;
+		}
+
 		$out->putActorUniqueId($this->mapId);
 
 		$type = 0;

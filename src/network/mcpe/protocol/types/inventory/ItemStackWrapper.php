@@ -36,11 +36,23 @@ final class ItemStackWrapper{
 		return new self($itemStack->getId() === 0 ? 0 : 1, $itemStack);
 	}
 
+	/**
+	 * The network descriptor has no use for the synthetic stack ID {@link self::legacy()} invents - the client would
+	 * read it as a real server stack ID.
+	 */
+	public static function legacyForProtocol(ItemStack $itemStack, int $protocolId) : self{
+		return $protocolId >= ProtocolInfo::PROTOCOL_1_26_40 ? new self(0, $itemStack) : self::legacy($itemStack);
+	}
+
 	public function getStackId() : int{ return $this->stackId; }
 
 	public function getItemStack() : ItemStack{ return $this->itemStack; }
 
 	public static function read(PacketSerializer $in, bool $hasLegacyNetId = false, bool $decodeExtraData = true) : self{
+		if($in->getProtocolId() >= ProtocolInfo::PROTOCOL_1_26_40){
+			return $in->getNetworkItemStackDescriptor($decodeExtraData);
+		}
+
 		if($in->getProtocolId() >= ProtocolInfo::PROTOCOL_1_16_220){
 			$stackId = 0;
 			$stack = $in->getItemStack(function(PacketSerializer $in) use (&$stackId) : void{
@@ -63,6 +75,11 @@ final class ItemStackWrapper{
 	}
 
 	public function write(PacketSerializer $out, bool $hasLegacyNetId = false) : void{
+		if($out->getProtocolId() >= ProtocolInfo::PROTOCOL_1_26_40){
+			$out->putNetworkItemStackDescriptor($this);
+			return;
+		}
+
 		if($out->getProtocolId() >= ProtocolInfo::PROTOCOL_1_16_220){
 			$closure = function(PacketSerializer $out) : void{
 				$out->putBool($this->stackId !== 0);

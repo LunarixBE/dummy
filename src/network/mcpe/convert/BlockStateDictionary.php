@@ -25,6 +25,7 @@ namespace pocketmine\network\mcpe\convert;
 
 use pocketmine\data\bedrock\block\BlockStateData;
 use pocketmine\data\bedrock\block\BlockTypeNames;
+use pocketmine\nbt\BigEndianNbtSerializer;
 use pocketmine\nbt\LittleEndianNbtSerializer;
 use pocketmine\nbt\NbtDataException;
 use pocketmine\nbt\tag\CompoundTag;
@@ -45,6 +46,7 @@ use function json_decode;
 use function ksort;
 use function ltrim;
 use function str_starts_with;
+use function zlib_decode;
 use const JSON_THROW_ON_ERROR;
 
 /**
@@ -315,6 +317,66 @@ final class BlockStateDictionary{
 		}
 
 		return new self($entries, $useHash);
+	}
+
+	/**
+	 * Loads the dictionary from a 1.26.40+ block palette (gzipped big-endian NBT, "blocks" list). Every entry carries
+	 * its own hashed network runtime ID in "network_id".
+	 */
+	public static function loadFromBlockPalette(string $blockPaletteContents, string $metaMapContents) : self{
+		$upgrader = GlobalBlockStateHandlers::getUpgrader()->getBlockStateUpgrader();
+		$metaMap = json_decode($metaMapContents, flags: JSON_THROW_ON_ERROR);
+		if(!is_array($metaMap)){
+			throw new \InvalidArgumentException("Invalid metaMap, expected array for root type, got " . get_debug_type($metaMap));
+		}
+
+		$paletteRaw = zlib_decode($blockPaletteContents);
+		if($paletteRaw === false){
+			throw new \InvalidArgumentException("Failed to decompress block palette");
+		}
+		$blocks = (new BigEndianNbtSerializer())->read($paletteRaw)->mustGetCompoundTag()->getListTag("blocks") ??
+			throw new \InvalidArgumentException("Missing \"blocks\" list in block palette");
+
+		$uniqueNames = [];
+		//see loadFromString()
+		foreach((new \ReflectionClass(BlockTypeNames::class))->getConstants() as $value){
+			if(is_string($value)){
+				$uniqueNames[$value] = $value;
+			}
+		}
+
+		$entries = [];
+		foreach($blocks as $i => $blockTag){
+			if(!($blockTag instanceof CompoundTag)){
+				throw new \InvalidArgumentException("Invalid block palette entry at offset $i, expected TAG_Compound, got " . get_debug_type($blockTag));
+			}
+			$meta = $metaMap[$i] ?? null;
+			if($meta === null){
+				throw new \InvalidArgumentException("Missing associated meta value for state $i (" . $blockTag . ")");
+			}
+			if(!is_int($meta)){
+				throw new \InvalidArgumentException("Invalid metaMap offset $i, expected int, got " . get_debug_type($meta));
+			}
+
+			$states = $blockTag->getCompoundTag(BlockStateData::TAG_STATES) ??
+				throw new \InvalidArgumentException("Missing states for palette entry $i");
+			$state = new BlockStateData(
+				$blockTag->getString(BlockStateData::TAG_NAME),
+				$states->getValue(),
+				$blockTag->getInt(BlockStateData::TAG_VERSION, BlockStateData::CURRENT_VERSION)
+			);
+
+			$newState = $upgrader->upgrade($state);
+			$uniqueName = $uniqueNames[$newState->getName()] ??= $newState->getName();
+			$entries[$blockTag->getInt("network_id")] = new BlockStateDictionaryEntry(
+				$uniqueName,
+				$newState->getStates(),
+				$meta,
+				$newState->equals($state) ? null : $state
+			);
+		}
+
+		return new self($entries, true);
 	}
 
 	public function networkIdsAreHashes() : bool {

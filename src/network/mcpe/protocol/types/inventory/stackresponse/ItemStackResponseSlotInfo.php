@@ -55,11 +55,16 @@ final class ItemStackResponseSlotInfo{
 		$slot = $in->getByte();
 		$hotbarSlot = $in->getByte();
 		$count = $in->getByte();
-		$itemStackId = $in->readServerItemStackId();
+		$is2640 = $in->getProtocolId() >= ProtocolInfo::PROTOCOL_1_26_40;
+		$itemStackId = $is2640
+			? ($in->readOptional(fn() => $in->getBool() ? $in->readServerItemStackId() : null) ?? 0)
+			: $in->readServerItemStackId();
 		if($in->getProtocolId() >= ProtocolInfo::PROTOCOL_1_16_200){
 			$customName = $in->getString();
 		}
-		if($in->getProtocolId() >= ProtocolInfo::PROTOCOL_1_21_50){
+		if($is2640){
+			$filteredCustomName = $in->readOptional(fn() => $in->getString());
+		}elseif($in->getProtocolId() >= ProtocolInfo::PROTOCOL_1_21_50){
 			$filteredCustomName = $in->getString();
 		}
 		if($in->getProtocolId() >= ProtocolInfo::PROTOCOL_1_16_210){
@@ -72,11 +77,21 @@ final class ItemStackResponseSlotInfo{
 		$out->putByte($this->slot);
 		$out->putByte($this->hotbarSlot);
 		$out->putByte($this->count);
-		$out->writeServerItemStackId($this->itemStackId);
+		$is2640 = $out->getProtocolId() >= ProtocolInfo::PROTOCOL_1_26_40;
+		if($is2640){
+			$out->writeOptional($this->itemStackId, function(int $itemStackId) use ($out) : void{
+				$out->putBool(true);
+				$out->writeServerItemStackId($itemStackId);
+			});
+		}else{
+			$out->writeServerItemStackId($this->itemStackId);
+		}
 		if($out->getProtocolId() >= ProtocolInfo::PROTOCOL_1_16_200){
 			$out->putString($this->customName);
 		}
-		if($out->getProtocolId() >= ProtocolInfo::PROTOCOL_1_21_50){
+		if($is2640){
+			$out->writeOptional($this->filteredCustomName, fn(string $v) => $out->putString($v));
+		}elseif($out->getProtocolId() >= ProtocolInfo::PROTOCOL_1_21_50){
 			$out->putString($this->filteredCustomName);
 		}
 		if($out->getProtocolId() >= ProtocolInfo::PROTOCOL_1_16_210){

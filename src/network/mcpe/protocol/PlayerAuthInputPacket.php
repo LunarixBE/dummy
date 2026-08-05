@@ -328,11 +328,29 @@ class PlayerAuthInputPacket extends DataPacket implements ServerboundPacket{
 		$this->moveVecX = $in->getLFloat();
 		$this->moveVecZ = $in->getLFloat();
 		$this->headYaw = $in->getLFloat();
-		$this->inputFlags = $in->getUnsignedVarLong();
+		//1.26.40 sends a list of set flag indices instead of a bitset
+		$is2640 = $in->getProtocolId() >= ProtocolInfo::PROTOCOL_1_26_40;
+		if($is2640){
+			$this->inputFlags = 0;
+			if($in->getBool()){
+				for($i = 0, $count = $in->getUnsignedVarInt(); $i < $count; ++$i){
+					$flag = $in->getVarInt();
+					if($flag < 0 || $flag >= PlayerAuthInputFlags::NUMBER_OF_FLAGS_1_26_40){
+						throw new PacketDecodeException("Unknown input flag $flag");
+					}
+					if($flag < 64){
+						//flags 64+ don't fit in the int used to store them, and aren't used server-side
+						$this->inputFlags |= 1 << $flag;
+					}
+				}
+			}
+		}else{
+			$this->inputFlags = $in->getUnsignedVarLong();
+		}
 		$this->inputMode = $in->getUnsignedVarInt();
 		$this->playMode = $in->getUnsignedVarInt();
 		if($in->getProtocolId() >= ProtocolInfo::PROTOCOL_1_19_0){
-			$this->interactionMode = $in->getUnsignedVarInt();
+			$this->interactionMode = $is2640 ? $in->getVarInt() : $in->getUnsignedVarInt();
 		}
 		if($in->getProtocolId() >= ProtocolInfo::PROTOCOL_1_21_40){
 			$this->interactRotation = $in->getVector2();
@@ -343,6 +361,42 @@ class PlayerAuthInputPacket extends DataPacket implements ServerboundPacket{
 		if($in->getProtocolId() >= ProtocolInfo::PROTOCOL_1_16_100){
 			$this->tick = $in->getUnsignedVarLong();
 			$this->delta = $in->getVector3();
+		}
+
+		if($is2640){
+			//every optional is preceded by a "field present in stream" flag
+			if($in->getBool()){
+				$this->itemInteractionData = $in->readOptional(fn() => ItemInteractionData::read($in));
+			}
+			if($in->getBool()){
+				$this->itemStackRequest = $in->readOptional(fn() => ItemStackRequest::read($in));
+			}
+			if($in->getBool()){
+				$this->blockActions = $in->readOptional(function() use ($in) : array{
+					$blockActions = [];
+					for($i = 0, $max = $in->getUnsignedVarInt(); $i < $max; ++$i){
+						$actionType = $in->getVarInt();
+						$blockActions[] = PlayerBlockActionWithBlockInfo::read($in, $actionType);
+					}
+					return $blockActions;
+				});
+			}
+			if($in->getBool()){
+				$vehicleRotation = $in->readOptional(fn() => $in->getVector2());
+				if($vehicleRotation !== null){
+					$this->vehicleVecX = $vehicleRotation->x;
+					$this->vehicleVecZ = $vehicleRotation->y;
+				}
+			}
+			if($in->getBool()){
+				$this->clientPredictedVehicleActorUniqueId = $in->readOptional(fn() => $in->getActorUniqueId());
+			}
+
+			$this->analogMoveVecX = $in->getLFloat();
+			$this->analogMoveVecZ = $in->getLFloat();
+			$this->cameraOrientation = $in->getVector3();
+			$this->rawMoveVector = $in->getVector2();
+			return;
 		}
 
 		if($in->getProtocolId() >= ProtocolInfo::PROTOCOL_1_16_210){
@@ -405,11 +459,26 @@ class PlayerAuthInputPacket extends DataPacket implements ServerboundPacket{
 		$out->putLFloat($this->moveVecX);
 		$out->putLFloat($this->moveVecZ);
 		$out->putLFloat($this->headYaw);
-		$out->putUnsignedVarLong($inputFlags);
+		$is2640 = $out->getProtocolId() >= ProtocolInfo::PROTOCOL_1_26_40;
+		if($is2640){
+			$setFlags = [];
+			for($i = 0; $i < 64; ++$i){
+				if(($inputFlags & (1 << $i)) !== 0){
+					$setFlags[] = $i;
+				}
+			}
+			$out->putBool(true);
+			$out->putUnsignedVarInt(count($setFlags));
+			foreach($setFlags as $flag){
+				$out->putVarInt($flag);
+			}
+		}else{
+			$out->putUnsignedVarLong($inputFlags);
+		}
 		$out->putUnsignedVarInt($this->inputMode);
 		$out->putUnsignedVarInt($this->playMode);
 		if($out->getProtocolId() >= ProtocolInfo::PROTOCOL_1_19_0){
-			$out->putUnsignedVarInt($this->interactionMode);
+			$is2640 ? $out->putVarInt($this->interactionMode) : $out->putUnsignedVarInt($this->interactionMode);
 		}
 		if($out->getProtocolId() >= ProtocolInfo::PROTOCOL_1_21_40){
 			$out->putVector2($this->interactRotation);
@@ -420,6 +489,34 @@ class PlayerAuthInputPacket extends DataPacket implements ServerboundPacket{
 		if($out->getProtocolId() >= ProtocolInfo::PROTOCOL_1_16_100){
 			$out->putUnsignedVarLong($this->tick);
 			$out->putVector3($this->delta);
+		}
+
+		if($is2640){
+			$out->putBool(true);
+			$out->writeOptional($this->itemInteractionData, fn(ItemInteractionData $v) => $v->write($out));
+			$out->putBool(true);
+			$out->writeOptional($this->itemStackRequest, fn(ItemStackRequest $v) => $v->write($out));
+			$out->putBool(true);
+			$out->writeOptional($this->blockActions, function(array $blockActions) use ($out) : void{
+				$out->putUnsignedVarInt(count($blockActions));
+				foreach($blockActions as $blockAction){
+					$out->putVarInt($blockAction->getActionType());
+					$blockAction->write($out);
+				}
+			});
+			$out->putBool(true);
+			$out->writeOptional(
+				$this->clientPredictedVehicleActorUniqueId !== null ? new Vector2($this->vehicleVecX ?? 0.0, $this->vehicleVecZ ?? 0.0) : null,
+				fn(Vector2 $v) => $out->putVector2($v)
+			);
+			$out->putBool(true);
+			$out->writeOptional($this->clientPredictedVehicleActorUniqueId, fn(int $v) => $out->putActorUniqueId($v));
+
+			$out->putLFloat($this->analogMoveVecX);
+			$out->putLFloat($this->analogMoveVecZ);
+			$out->putVector3($this->cameraOrientation);
+			$out->putVector2($this->rawMoveVector);
+			return;
 		}
 
 		if($out->getProtocolId() >= ProtocolInfo::PROTOCOL_1_16_210){

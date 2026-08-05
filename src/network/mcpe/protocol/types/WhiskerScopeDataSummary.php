@@ -23,6 +23,7 @@ declare(strict_types=1);
 
 namespace pocketmine\network\mcpe\protocol\types;
 
+use pocketmine\network\mcpe\protocol\ProtocolInfo;
 use pocketmine\network\mcpe\protocol\serializer\PacketSerializer;
 
 final class WhiskerScopeDataSummary{
@@ -46,8 +47,13 @@ final class WhiskerScopeDataSummary{
 	public function getTotalLowCostNS() : int{ return $this->totalLowCostNS; }
 
 	public static function read(PacketSerializer $in) : self{
-		$label = $in->getString();
-		$indentation = $in->getString();
+		if($in->getProtocolId() >= ProtocolInfo::PROTOCOL_1_26_40){
+			$indentation = $in->getString();
+			$label = $in->getString();
+		}else{
+			$label = $in->getString();
+			$indentation = $in->getString();
+		}
 		$totalHighCostNS = $in->getLLong();
 		$totalMidCostNS = $in->getLLong();
 		$totalLowCostNS = $in->getLLong();
@@ -62,8 +68,13 @@ final class WhiskerScopeDataSummary{
 	}
 
 	public function write(PacketSerializer $out) : void{
-		$out->putString($this->label);
-		$out->putString($this->indentation);
+		if($out->getProtocolId() >= ProtocolInfo::PROTOCOL_1_26_40){
+			$out->putString($this->indentation);
+			$out->putString($this->label);
+		}else{
+			$out->putString($this->label);
+			$out->putString($this->indentation);
+		}
 		$out->putLLong($this->totalHighCostNS);
 		$out->putLLong($this->totalMidCostNS);
 		$out->putLLong($this->totalLowCostNS);

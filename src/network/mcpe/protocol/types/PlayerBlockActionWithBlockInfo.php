@@ -23,6 +23,7 @@ declare(strict_types=1);
 
 namespace pocketmine\network\mcpe\protocol\types;
 
+use pocketmine\network\mcpe\protocol\ProtocolInfo;
 use pocketmine\network\mcpe\protocol\serializer\PacketSerializer;
 
 /**
@@ -48,6 +49,12 @@ final class PlayerBlockActionWithBlockInfo implements PlayerBlockAction{
 	public static function read(PacketSerializer $in, int $actionType) : self{
 		$blockPosition = $in->getSignedBlockPosition();
 		$face = $in->getVarInt();
+		//1.26.40 sends every action type through this struct
+		if($in->getProtocolId() >= ProtocolInfo::PROTOCOL_1_26_40 && !self::isValidActionType($actionType)){
+			$result = new self(PlayerAction::ABORT_BREAK, $blockPosition, $face);
+			$result->actionType = $actionType;
+			return $result;
+		}
 		return new self($actionType, $blockPosition, $face);
 	}
 

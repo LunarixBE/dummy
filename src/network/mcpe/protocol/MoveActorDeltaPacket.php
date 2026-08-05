@@ -73,6 +73,42 @@ class MoveActorDeltaPacket extends DataPacket implements ClientboundPacket{
 
 	protected function decodePayload(PacketSerializer $in) : void{
 		$this->actorRuntimeId = $in->getActorRuntimeId();
+
+		if($in->getProtocolId() >= ProtocolInfo::PROTOCOL_1_26_40){
+			//1.26.40 replaced the bitset with per-field presence bools; the flags field is rebuilt from those
+			$this->flags = 0;
+
+			$readCoord = function(PacketSerializer $in, int $flag) : float{
+				if(!$in->getBool()){
+					return 0.0;
+				}
+				$this->flags |= $flag;
+				return $in->getLFloat();
+			};
+			$readRotation = function(PacketSerializer $in, int $flag) : float{
+				if(!$in->getBool()){
+					return 0.0;
+				}
+				$this->flags |= $flag;
+				return $in->getRotationByte();
+			};
+
+			$this->xPos = $readCoord($in, self::FLAG_HAS_X);
+			$this->yPos = $readCoord($in, self::FLAG_HAS_Y);
+			$this->zPos = $readCoord($in, self::FLAG_HAS_Z);
+			$this->pitch = $readRotation($in, self::FLAG_HAS_PITCH);
+			$this->yaw = $readRotation($in, self::FLAG_HAS_YAW);
+			$this->headYaw = $readRotation($in, self::FLAG_HAS_HEAD_YAW);
+
+			foreach([self::FLAG_GROUND, self::FLAG_TELEPORT, self::FLAG_FORCE_MOVE_LOCAL_ENTITY] as $flag){
+				if($in->getBool()){
+					$this->flags |= $flag;
+				}
+			}
+			$in->getBool(); //forceCompletion
+			return;
+		}
+
 		$this->flags = $in->getLShort();
 		$this->xPos = $this->maybeReadCoord(self::FLAG_HAS_X, $in);
 		$this->yPos = $this->maybeReadCoord(self::FLAG_HAS_Y, $in);
@@ -100,6 +136,27 @@ class MoveActorDeltaPacket extends DataPacket implements ClientboundPacket{
 
 	protected function encodePayload(PacketSerializer $out) : void{
 		$out->putActorRuntimeId($this->actorRuntimeId);
+
+		if($out->getProtocolId() >= ProtocolInfo::PROTOCOL_1_26_40){
+			foreach([self::FLAG_HAS_X => $this->xPos, self::FLAG_HAS_Y => $this->yPos, self::FLAG_HAS_Z => $this->zPos] as $flag => $value){
+				$out->putBool($present = ($this->flags & $flag) !== 0);
+				if($present){
+					$out->putLFloat($value);
+				}
+			}
+			foreach([self::FLAG_HAS_PITCH => $this->pitch, self::FLAG_HAS_YAW => $this->yaw, self::FLAG_HAS_HEAD_YAW => $this->headYaw] as $flag => $value){
+				$out->putBool($present = ($this->flags & $flag) !== 0);
+				if($present){
+					$out->putRotationByte($value);
+				}
+			}
+			$out->putBool(($this->flags & self::FLAG_GROUND) !== 0);
+			$out->putBool(($this->flags & self::FLAG_TELEPORT) !== 0);
+			$out->putBool(($this->flags & self::FLAG_FORCE_MOVE_LOCAL_ENTITY) !== 0);
+			$out->putBool(false); //forceCompletion
+			return;
+		}
+
 		$out->putLShort($this->flags);
 		$this->maybeWriteCoord(self::FLAG_HAS_X, $this->xPos, $out);
 		$this->maybeWriteCoord(self::FLAG_HAS_Y, $this->yPos, $out);

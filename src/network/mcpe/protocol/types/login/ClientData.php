@@ -140,6 +140,9 @@ final class ClientData{
 	/** @required */
 	public bool $PremiumSkin = false;
 
+	/** >= PROTOCOL_1_26_40 */
+	public string $ProfileHash = "";
+
 	/** @required */
 	public string $SelfSignedId;
 

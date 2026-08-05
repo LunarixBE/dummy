@@ -60,9 +60,10 @@ class SubChunkPacket extends DataPacket implements ClientboundPacket{
 	protected function decodePayload(PacketSerializer $in) : void{
 		$cacheEnabled = $in->getBool();
 		$this->dimension = $in->getVarInt();
-		$this->baseSubChunkPosition = SubChunkPosition::read($in);
+		$is2640 = $in->getProtocolId() >= ProtocolInfo::PROTOCOL_1_26_40;
+		$this->baseSubChunkPosition = SubChunkPosition::read($in, $is2640);
 
-		$count = $in->getLInt();
+		$count = $is2640 ? $in->getUnsignedVarInt() : $in->getLInt();
 		if($cacheEnabled){
 			$entries = [];
 			for($i = 0; $i < $count; $i++){
@@ -81,9 +82,10 @@ class SubChunkPacket extends DataPacket implements ClientboundPacket{
 	protected function encodePayload(PacketSerializer $out) : void{
 		$out->putBool($this->entries instanceof ListWithBlobHashes);
 		$out->putVarInt($this->dimension);
-		$this->baseSubChunkPosition->write($out);
+		$is2640 = $out->getProtocolId() >= ProtocolInfo::PROTOCOL_1_26_40;
+		$this->baseSubChunkPosition->write($out, $is2640);
 
-		$out->putLInt(count($this->entries->getEntries()));
+		$is2640 ? $out->putUnsignedVarInt(count($this->entries->getEntries())) : $out->putLInt(count($this->entries->getEntries()));
 
 		foreach($this->entries->getEntries() as $entry){
 			$entry->write($out);

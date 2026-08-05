@@ -103,6 +103,30 @@ class LevelChunkPacket extends DataPacket implements ClientboundPacket{
 			$this->dimensionId = $in->getVarInt();
 		}
 
+		if($in->getProtocolId() >= ProtocolInfo::PROTOCOL_1_26_40){
+			//1.26.40 split the overloaded count into a plain count plus an optional request limit
+			$this->subChunkCount = $in->getUnsignedVarInt();
+			$requestLimit = $in->getBool() ? $in->getVarInt() : null;
+			$this->clientSubChunkRequestsEnabled = $requestLimit !== null;
+			if($requestLimit !== null){
+				$this->subChunkCount = $requestLimit;
+			}
+
+			$cacheEnabled = $in->getBool();
+			$hashes = [];
+			$count = $in->getUnsignedVarInt();
+			if($count > self::MAX_BLOB_HASHES){
+				throw new PacketDecodeException("Expected at most " . self::MAX_BLOB_HASHES . " blob hashes, got " . $count);
+			}
+			for($i = 0; $i < $count; ++$i){
+				$hashes[] = $in->getLLong();
+			}
+			$this->usedBlobHashes = $cacheEnabled ? $hashes : null;
+
+			$this->extraPayload = $in->getString();
+			return;
+		}
+
 		$subChunkCountButNotReally = $in->getUnsignedVarInt();
 		if($subChunkCountButNotReally === self::CLIENT_REQUEST_FULL_COLUMN_FAKE_COUNT){
 			$this->clientSubChunkRequestsEnabled = true;
@@ -133,6 +157,24 @@ class LevelChunkPacket extends DataPacket implements ClientboundPacket{
 		$this->chunkPosition->write($out);
 		if($out->getProtocolId() >= ProtocolInfo::PROTOCOL_1_20_60){
 			$out->putVarInt($this->dimensionId);
+		}
+
+		if($out->getProtocolId() >= ProtocolInfo::PROTOCOL_1_26_40){
+			$requestLimit = $this->clientSubChunkRequestsEnabled && $this->subChunkCount !== PHP_INT_MAX ? $this->subChunkCount : null;
+			$out->putUnsignedVarInt($this->clientSubChunkRequestsEnabled ? 0 : $this->subChunkCount);
+			$out->putBool($requestLimit !== null);
+			if($requestLimit !== null){
+				$out->putVarInt($requestLimit);
+			}
+
+			$out->putBool($this->usedBlobHashes !== null);
+			$out->putUnsignedVarInt(count($this->usedBlobHashes ?? []));
+			foreach($this->usedBlobHashes ?? [] as $hash){
+				$out->putLLong($hash);
+			}
+
+			$out->putString($this->extraPayload);
+			return;
 		}
 
 		if($this->clientSubChunkRequestsEnabled && $out->getProtocolId() >= ProtocolInfo::PROTOCOL_1_18_10){

@@ -49,4 +49,16 @@ final class ItemStackRequestActionType{
 	public const CRAFTING_LOOM = 17;
 	public const CRAFTING_NON_IMPLEMENTED_DEPRECATED_ASK_TY_LAING = 18;
 	public const CRAFTING_RESULTS_DEPRECATED_ASK_TY_LAING = 19; //no idea what this is for
+
+	/**
+	 * >= PROTOCOL_1_26_40 dropped PLACE_INTO_BUNDLE and TAKE_FROM_BUNDLE, moving everything from LAB_TABLE_COMBINE
+	 * down by 2. The constants above keep the old numbering.
+	 */
+	public static function toWireTypeId1_26_40(int $typeId) : int{
+		return $typeId >= self::LAB_TABLE_COMBINE ? $typeId - 2 : $typeId;
+	}
+
+	public static function fromWireTypeId1_26_40(int $wireTypeId) : int{
+		return $wireTypeId >= self::PLACE_INTO_BUNDLE ? $wireTypeId + 2 : $wireTypeId;
+	}
 }

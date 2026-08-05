@@ -89,10 +89,17 @@ final class ItemStackRequest{
 		$requestId = $in->readItemStackRequestId();
 		$actions = [];
 
+		$is2640 = $in->getProtocolId() >= ProtocolInfo::PROTOCOL_1_26_40;
 		for($i = 0, $len = $in->getUnsignedVarInt(); $i < $len; ++$i){
-			$typeId = $in->getByte();
-			if($typeId >= ItemStackRequestActionType::PLACE_INTO_BUNDLE && $in->getProtocolId() < ProtocolInfo::PROTOCOL_1_18_10){
-				$typeId += ItemStackRequestActionType::LAB_TABLE_COMBINE - ItemStackRequestActionType::PLACE_INTO_BUNDLE;
+			if($is2640){
+				//1.26.40 renumbered these, dropping the bundle actions
+				$typeId = ItemStackRequestActionType::fromWireTypeId1_26_40($in->getUnsignedVarInt());
+				$in->getByte(); //legacy type ID
+			}else{
+				$typeId = $in->getByte();
+				if($typeId >= ItemStackRequestActionType::PLACE_INTO_BUNDLE && $in->getProtocolId() < ProtocolInfo::PROTOCOL_1_18_10){
+					$typeId += ItemStackRequestActionType::LAB_TABLE_COMBINE - ItemStackRequestActionType::PLACE_INTO_BUNDLE;
+				}
 			}
 			$actions[] = self::readAction($in, $typeId);
 		}
@@ -112,12 +119,18 @@ final class ItemStackRequest{
 	public function write(PacketSerializer $out) : void{
 		$out->writeItemStackRequestId($this->requestId);
 		$out->putUnsignedVarInt(count($this->actions));
+		$is2640 = $out->getProtocolId() >= ProtocolInfo::PROTOCOL_1_26_40;
 		foreach($this->actions as $action){
 			$typeId = $action->getTypeId();
-			if($typeId >= ItemStackRequestActionType::PLACE_INTO_BUNDLE && $out->getProtocolId() < ProtocolInfo::PROTOCOL_1_18_10){
-				$typeId -= ItemStackRequestActionType::LAB_TABLE_COMBINE - ItemStackRequestActionType::PLACE_INTO_BUNDLE;
+			if($is2640){
+				$out->putUnsignedVarInt(ItemStackRequestActionType::toWireTypeId1_26_40($typeId));
+				$out->putByte($typeId);
+			}else{
+				if($typeId >= ItemStackRequestActionType::PLACE_INTO_BUNDLE && $out->getProtocolId() < ProtocolInfo::PROTOCOL_1_18_10){
+					$typeId -= ItemStackRequestActionType::LAB_TABLE_COMBINE - ItemStackRequestActionType::PLACE_INTO_BUNDLE;
+				}
+				$out->putByte($typeId);
 			}
-			$out->putByte($typeId);
 			$action->write($out);
 		}
 		$out->putUnsignedVarInt(count($this->filterStrings));

@@ -101,22 +101,26 @@ class BiomeDefinitionListPacket extends DataPacket implements ClientboundPacket{
 			return $stringIndexLookup[$string];
 		};
 
-		$definitionData = array_map(fn(BiomeDefinitionEntry $entry) => new BiomeDefinitionData(
-			$addString($entry->getBiomeName()),
-			$entry->getId(),
-			$entry->getTemperature(),
-			$entry->getDownfall(),
-			$entry->getRedSporeDensity(),
-			$entry->getBlueSporeDensity(),
-			$entry->getAshDensity(),
-			$entry->getWhiteAshDensity(),
-			$entry->getDepth(),
-			$entry->getScale(),
-			$entry->getMapWaterColor(),
-			$entry->hasRain(),
-			$entry->getTags() === null ? null : array_map($addString, $entry->getTags()),
-			$entry->getChunkGenData(),
-		), $definitions);
+		$definitionData = array_map(function(BiomeDefinitionEntry $entry) use ($addString) : BiomeDefinitionData{
+			$data = new BiomeDefinitionData(
+				$addString($entry->getBiomeName()),
+				$entry->getId(),
+				$entry->getTemperature(),
+				$entry->getDownfall(),
+				$entry->getRedSporeDensity(),
+				$entry->getBlueSporeDensity(),
+				$entry->getAshDensity(),
+				$entry->getWhiteAshDensity(),
+				$entry->getDepth(),
+				$entry->getScale(),
+				$entry->getMapWaterColor(),
+				$entry->hasRain(),
+				$entry->getTags() === null ? null : array_map($addString, $entry->getTags()),
+				$entry->getChunkGenData(),
+			);
+			$data->setFoliageSnow($entry->getFoliageSnow());
+			return $data;
+		}, $definitions);
 
 		return self::create($definitionData, $strings);
 	}
@@ -152,6 +156,7 @@ class BiomeDefinitionListPacket extends DataPacket implements ClientboundPacket{
 			$data->hasRain(),
 			($tagIndexes = $data->getTagIndexes()) === null ? null : array_map($this->locateString(...), $tagIndexes),
 			$data->getChunkGenData(),
+			$data->getFoliageSnow(),
 		), $this->definitionData ?? throw new PacketDecodeException("No definition data available"));
 	}
 

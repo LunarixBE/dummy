@@ -23,17 +23,26 @@ declare(strict_types=1);
 
 namespace pocketmine\network\mcpe\protocol\types\recipe;
 
+use pocketmine\network\mcpe\protocol\ProtocolInfo;
 use pocketmine\network\mcpe\protocol\serializer\PacketSerializer;
 use function count;
 
 final class RecipeUnlockingRequirement{
+
+	/** >= PROTOCOL_1_26_40 */
+	public const CONTEXT_NONE = 0;
+	public const CONTEXT_ALWAYS_UNLOCKED = 1;
+	public const CONTEXT_PLAYER_IN_WATER = 2;
+	public const CONTEXT_PLAYER_HAS_MANY_ITEMS = 3;
 
 	/**
 	 * @param RecipeIngredient[]|null $unlockingIngredients
 	 * @phpstan-param list<RecipeIngredient>|null $unlockingIngredients
 	 */
 	public function __construct(
-		private ?array $unlockingIngredients
+		private ?array $unlockingIngredients,
+		/** >= PROTOCOL_1_26_40 */
+		private int $unlockingContext = self::CONTEXT_NONE
 	){}
 
 	/**
@@ -42,7 +51,23 @@ final class RecipeUnlockingRequirement{
 	 */
 	public function getUnlockingIngredients() : ?array{ return $this->unlockingIngredients; }
 
+	/** >= PROTOCOL_1_26_40 */
+	public function getUnlockingContext() : int{ return $this->unlockingContext; }
+
 	public static function read(PacketSerializer $in) : self{
+		if($in->getProtocolId() >= ProtocolInfo::PROTOCOL_1_26_40){
+			$unlockingContext = $in->getVarInt();
+			$unlockingIngredients = null;
+			if($in->getBool()){
+				$unlockingIngredients = [];
+				for($i = 0, $count = $in->getUnsignedVarInt(); $i < $count; $i++){
+					$unlockingIngredients[] = $in->getRecipeIngredient();
+				}
+			}
+
+			return new self($unlockingIngredients, $unlockingContext);
+		}
+
 		//I don't know what the point of this structure is. It could easily have been a list<RecipeIngredient> instead.
 		//It's basically just an optional list, which could have been done by an empty list wherever it's not needed.
 		$unlockingContext = $in->getBool();
@@ -58,7 +83,12 @@ final class RecipeUnlockingRequirement{
 	}
 
 	public function write(PacketSerializer $out) : void{
-		$out->putBool($this->unlockingIngredients === null);
+		if($out->getProtocolId() >= ProtocolInfo::PROTOCOL_1_26_40){
+			$out->putVarInt($this->unlockingContext);
+			$out->putBool($this->unlockingIngredients !== null);
+		}else{
+			$out->putBool($this->unlockingIngredients === null);
+		}
 		if($this->unlockingIngredients !== null){
 			$out->putUnsignedVarInt(count($this->unlockingIngredients));
 			foreach($this->unlockingIngredients as $ingredient){

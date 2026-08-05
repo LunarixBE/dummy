@@ -23,6 +23,7 @@ declare(strict_types=1);
 
 namespace pocketmine\network\mcpe\protocol\types;
 
+use pocketmine\network\mcpe\protocol\ProtocolInfo;
 use pocketmine\network\mcpe\protocol\serializer\PacketSerializer;
 use pocketmine\network\mcpe\protocol\types\inventory\InventoryTransactionChangedSlotsHack;
 use pocketmine\network\mcpe\protocol\types\inventory\UseItemTransactionData;
@@ -53,9 +54,26 @@ final class ItemInteractionData{
 		return $this->transactionData;
 	}
 
+	/** the client only sends changed slots for the negative even request IDs it uses for slot syncing */
+	private static function hasChangedSlots(int $requestId) : bool{
+		return $requestId < -1 && ($requestId & 1) === 0;
+	}
+
 	public static function read(PacketSerializer $in) : self{
 		$requestId = $in->getVarInt();
 		$requestChangedSlots = [];
+
+		if($in->getProtocolId() >= ProtocolInfo::PROTOCOL_1_26_40){
+			if($in->getBool() && self::hasChangedSlots($requestId)){
+				for($i = 0, $len = $in->getUnsignedVarInt(); $i < $len; ++$i){
+					$requestChangedSlots[] = InventoryTransactionChangedSlotsHack::read($in);
+				}
+			}
+			$transactionData = new UseItemTransactionData();
+			$transactionData->decodeAuthInput($in);
+			return new self($requestId, $requestChangedSlots, $transactionData);
+		}
+
 		if($requestId !== 0){
 			$len = $in->getUnsignedVarInt();
 			for($i = 0; $i < $len; ++$i){
@@ -69,6 +87,20 @@ final class ItemInteractionData{
 
 	public function write(PacketSerializer $out) : void{
 		$out->putVarInt($this->requestId);
+
+		if($out->getProtocolId() >= ProtocolInfo::PROTOCOL_1_26_40){
+			$hasChangedSlots = self::hasChangedSlots($this->requestId);
+			$out->putBool($hasChangedSlots);
+			if($hasChangedSlots){
+				$out->putUnsignedVarInt(count($this->requestChangedSlots));
+				foreach($this->requestChangedSlots as $changedSlot){
+					$changedSlot->write($out);
+				}
+			}
+			$this->transactionData->encodeAuthInput($out);
+			return;
+		}
+
 		if($this->requestId !== 0){
 			$out->putUnsignedVarInt(count($this->requestChangedSlots));
 			foreach($this->requestChangedSlots as $changedSlot){

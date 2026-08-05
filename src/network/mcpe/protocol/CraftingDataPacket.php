@@ -35,6 +35,7 @@ use pocketmine\network\mcpe\protocol\types\recipe\ShapedRecipe;
 use pocketmine\network\mcpe\protocol\types\recipe\ShapelessRecipe;
 use pocketmine\network\mcpe\protocol\types\recipe\SmithingTransformRecipe;
 use pocketmine\network\mcpe\protocol\types\recipe\SmithingTrimRecipe;
+use function array_fill_keys;
 use function count;
 
 class CraftingDataPacket extends DataPacket implements ClientboundPacket{
@@ -50,6 +51,21 @@ class CraftingDataPacket extends DataPacket implements ClientboundPacket{
 	public const ENTRY_SHAPED_CHEMISTRY = 7;
 	public const ENTRY_SMITHING_TRANSFORM = 8;
 	public const ENTRY_SMITHING_TRIM = 9;
+
+	/**
+	 * >= PROTOCOL_1_26_40 sends one length-prefixed bucket per recipe type in this order, instead of a flat list.
+	 * Furnace recipes are no longer part of the packet.
+	 */
+	private const BUCKET_ORDER_1_26_40 = [
+		self::ENTRY_SHAPED,
+		self::ENTRY_SHAPELESS,
+		self::ENTRY_MULTI,
+		self::ENTRY_USER_DATA_SHAPELESS,
+		self::ENTRY_SHAPELESS_CHEMISTRY,
+		self::ENTRY_SHAPED_CHEMISTRY,
+		self::ENTRY_SMITHING_TRANSFORM,
+		self::ENTRY_SMITHING_TRIM,
+	];
 
 	/** @var RecipeWithTypeId[] */
 	public array $recipesWithTypeIds = [];
@@ -79,6 +95,23 @@ class CraftingDataPacket extends DataPacket implements ClientboundPacket{
 	}
 
 	protected function decodePayload(PacketSerializer $in) : void{
+		if($in->getProtocolId() >= ProtocolInfo::PROTOCOL_1_26_40){
+			foreach(self::BUCKET_ORDER_1_26_40 as $recipeType){
+				for($i = 0, $count = $in->getUnsignedVarInt(); $i < $count; ++$i){
+					$this->recipesWithTypeIds[] = match($recipeType){
+						self::ENTRY_SHAPELESS, self::ENTRY_USER_DATA_SHAPELESS, self::ENTRY_SHAPELESS_CHEMISTRY => ShapelessRecipe::decode($recipeType, $in),
+						self::ENTRY_SHAPED, self::ENTRY_SHAPED_CHEMISTRY => ShapedRecipe::decode($recipeType, $in),
+						self::ENTRY_MULTI => MultiRecipe::decode($recipeType, $in),
+						self::ENTRY_SMITHING_TRANSFORM => SmithingTransformRecipe::decode($recipeType, $in),
+						self::ENTRY_SMITHING_TRIM => SmithingTrimRecipe::decode($recipeType, $in),
+						default => throw new PacketDecodeException("Unhandled recipe type $recipeType"),
+					};
+				}
+			}
+			$this->decodeTail($in);
+			return;
+		}
+
 		$recipeCount = $in->getUnsignedVarInt();
 		$previousType = "none";
 		for($i = 0; $i < $recipeCount; ++$i){
@@ -95,6 +128,12 @@ class CraftingDataPacket extends DataPacket implements ClientboundPacket{
 			};
 			$previousType = $recipeType;
 		}
+
+		$this->decodeTail($in);
+	}
+
+	/** everything after the recipe list - unchanged by 1.26.40 */
+	private function decodeTail(PacketSerializer $in) : void{
 		for($i = 0, $count = $in->getUnsignedVarInt(); $i < $count; ++$i){
 			$inputId = $in->getVarInt();
 			$inputMeta = $in->getVarInt();
@@ -128,11 +167,35 @@ class CraftingDataPacket extends DataPacket implements ClientboundPacket{
 	}
 
 	protected function encodePayload(PacketSerializer $out) : void{
+		if($out->getProtocolId() >= ProtocolInfo::PROTOCOL_1_26_40){
+			$buckets = array_fill_keys(self::BUCKET_ORDER_1_26_40, []);
+			foreach($this->recipesWithTypeIds as $d){
+				$typeId = $d->getTypeId();
+				if(!isset($buckets[$typeId])){
+					throw new \InvalidArgumentException("Unhandled recipe type $typeId");
+				}
+				$buckets[$typeId][] = $d;
+			}
+			foreach($buckets as $recipes){
+				$out->putUnsignedVarInt(count($recipes));
+				foreach($recipes as $d){
+					$d->encode($out);
+				}
+			}
+			$this->encodeTail($out);
+			return;
+		}
+
 		$out->putUnsignedVarInt(count($this->recipesWithTypeIds));
 		foreach($this->recipesWithTypeIds as $d){
 			$out->putVarInt($d->getTypeId());
 			$d->encode($out);
 		}
+
+		$this->encodeTail($out);
+	}
+
+	private function encodeTail(PacketSerializer $out) : void{
 		$out->putUnsignedVarInt(count($this->potionTypeRecipes));
 		foreach($this->potionTypeRecipes as $recipe){
 			$out->putVarInt($recipe->getInputItemId());

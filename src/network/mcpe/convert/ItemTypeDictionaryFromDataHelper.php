@@ -25,6 +25,7 @@ namespace pocketmine\network\mcpe\convert;
 
 use pocketmine\data\bedrock\BedrockDataFiles;
 use pocketmine\errorhandler\ErrorToExceptionHandler;
+use pocketmine\nbt\BigEndianNbtSerializer;
 use pocketmine\nbt\LittleEndianNbtSerializer;
 use pocketmine\nbt\tag\CompoundTag;
 use pocketmine\network\mcpe\protocol\ProtocolInfo;
@@ -41,11 +42,13 @@ use function is_int;
 use function is_string;
 use function json_decode;
 use function str_replace;
+use function zlib_decode;
 
 final class ItemTypeDictionaryFromDataHelper{
 
 	private const PATHS = [
 		ProtocolInfo::CURRENT_PROTOCOL => "",
+		ProtocolInfo::PROTOCOL_1_26_30 => "-1.26.30",
 		ProtocolInfo::PROTOCOL_1_26_20 => "-1.26.20",
 		ProtocolInfo::PROTOCOL_1_26_10 => "-1.26.10",
 		ProtocolInfo::PROTOCOL_1_26_0 => "-1.26.0",
@@ -110,7 +113,53 @@ final class ItemTypeDictionaryFromDataHelper{
 	];
 
 	public static function loadFromProtocolId(int $protocolId) : ItemTypeDictionary{
+		if($protocolId >= ProtocolInfo::PROTOCOL_1_26_40){
+			//1.26.40 replaced required_item_list.json with item_palette.json + item_components.nbt
+			return self::loadFromItemPalette(
+				Filesystem::fileGetContents(BedrockDataFiles::ITEM_PALETTE_JSON),
+				Filesystem::fileGetContents(BedrockDataFiles::ITEM_COMPONENTS_NBT)
+			);
+		}
+
 		return self::loadFromString(Filesystem::fileGetContents(str_replace(".json", self::PATHS[$protocolId] . ".json", BedrockDataFiles::REQUIRED_ITEM_LIST_JSON)));
+	}
+
+	public static function loadFromItemPalette(string $data, ?string $componentData = null) : ItemTypeDictionary{
+		$table = json_decode($data, true);
+		if(!is_array($table) || !isset($table["items"]) || !is_array($table["items"])){
+			throw new AssumptionFailedError("Invalid item palette format");
+		}
+
+		$components = [];
+		if($componentData !== null){
+			$componentsRaw = zlib_decode($componentData);
+			if($componentsRaw === false){
+				throw new AssumptionFailedError("Failed to decompress item components");
+			}
+			foreach((new BigEndianNbtSerializer())->read($componentsRaw)->mustGetCompoundTag() as $itemName => $tag){
+				if($tag instanceof CompoundTag){
+					$components[$itemName] = $tag;
+				}
+			}
+		}
+
+		$emptyNBT = new CacheableNbt(new CompoundTag());
+
+		$params = [];
+		foreach($table["items"] as $entry){
+			if(!is_array($entry) || !isset($entry["name"], $entry["id"], $entry["version"], $entry["component_based"]) || !is_string($entry["name"]) || !is_int($entry["id"]) || !is_int($entry["version"]) || !is_bool($entry["component_based"])){
+				throw new AssumptionFailedError("Invalid item palette entry format");
+			}
+			$componentNbt = $components[$entry["name"]] ?? null;
+			$params[] = new ItemTypeEntry(
+				$entry["name"],
+				$entry["id"],
+				$entry["component_based"],
+				$entry["version"],
+				$componentNbt === null ? $emptyNBT : new CacheableNbt($componentNbt)
+			);
+		}
+		return new ItemTypeDictionary($params);
 	}
 
 	public static function loadFromString(string $data) : ItemTypeDictionary{

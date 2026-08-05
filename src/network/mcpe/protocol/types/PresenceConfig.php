@@ -40,6 +40,9 @@ final class PresenceConfig{
 	public function getRichPresenceId() : string{ return $this->richPresenceId; }
 
 	public static function read(PacketSerializer $in) : self{
+		if($in->getProtocolId() >= ProtocolInfo::PROTOCOL_1_26_40){
+			return new self(null, null, $in->readOptional(fn() => $in->getString()) ?? "");
+		}
 		if($in->getProtocolId() >= ProtocolInfo::PROTOCOL_1_26_30){
 			$experienceName = $in->readOptional(fn() => $in->getString());
 			$worldName = $in->readOptional(fn() => $in->getString());
@@ -50,6 +53,10 @@ final class PresenceConfig{
 	}
 
 	public function write(PacketSerializer $out) : void{
+		if($out->getProtocolId() >= ProtocolInfo::PROTOCOL_1_26_40){
+			$out->writeOptional($this->richPresenceId === "" ? null : $this->richPresenceId, fn(string $v) => $out->putString($v));
+			return;
+		}
 		if($out->getProtocolId() >= ProtocolInfo::PROTOCOL_1_26_30){
 			$out->writeOptional($this->experienceName, fn(string $v) => $out->putString($v));
 			$out->writeOptional($this->worldName, fn(string $v) => $out->putString($v));

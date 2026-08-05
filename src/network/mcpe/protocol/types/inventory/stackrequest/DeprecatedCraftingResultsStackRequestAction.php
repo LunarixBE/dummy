@@ -23,6 +23,7 @@ declare(strict_types=1);
 
 namespace pocketmine\network\mcpe\protocol\types\inventory\stackrequest;
 
+use pocketmine\network\mcpe\protocol\ProtocolInfo;
 use pocketmine\network\mcpe\protocol\serializer\PacketSerializer;
 use pocketmine\network\mcpe\protocol\types\GetTypeIdFromConstTrait;
 use pocketmine\network\mcpe\protocol\types\inventory\ItemStack;
@@ -38,22 +39,26 @@ final class DeprecatedCraftingResultsStackRequestAction extends ItemStackRequest
 	public const ID = ItemStackRequestActionType::CRAFTING_RESULTS_DEPRECATED_ASK_TY_LAING;
 
 	/**
-	 * @param ItemStack[] $results
+	 * >= PROTOCOL_1_26_40 uses the request descriptor instead of full item stacks, so the element type depends on the
+	 * protocol this was decoded from.
+	 *
+	 * @param ItemStack[]|ItemStackRequestNetworkItemInstanceDescriptor[] $results
 	 */
 	public function __construct(
 		private array $results,
 		private int $iterations
 	){}
 
-	/** @return ItemStack[] */
+	/** @return ItemStack[]|ItemStackRequestNetworkItemInstanceDescriptor[] */
 	public function getResults() : array{ return $this->results; }
 
 	public function getIterations() : int{ return $this->iterations; }
 
 	public static function read(PacketSerializer $in) : self{
+		$is2640 = $in->getProtocolId() >= ProtocolInfo::PROTOCOL_1_26_40;
 		$results = [];
 		for($i = 0, $len = $in->getUnsignedVarInt(); $i < $len; ++$i){
-			$results[] = $in->getItemStackWithoutStackId(false);
+			$results[] = $is2640 ? ItemStackRequestNetworkItemInstanceDescriptor::read($in) : $in->getItemStackWithoutStackId(false);
 		}
 		$iterations = $in->getByte();
 		return new self($results, $iterations);
@@ -62,7 +67,11 @@ final class DeprecatedCraftingResultsStackRequestAction extends ItemStackRequest
 	public function write(PacketSerializer $out) : void{
 		$out->putUnsignedVarInt(count($this->results));
 		foreach($this->results as $result){
-			$out->putItemStackWithoutStackId($result);
+			if($result instanceof ItemStackRequestNetworkItemInstanceDescriptor){
+				$result->write($out);
+			}else{
+				$out->putItemStackWithoutStackId($result);
+			}
 		}
 		$out->putByte($this->iterations);
 	}

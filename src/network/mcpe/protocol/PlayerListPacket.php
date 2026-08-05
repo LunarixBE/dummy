@@ -34,6 +34,10 @@ class PlayerListPacket extends DataPacket implements ClientboundPacket{
 	public const TYPE_ADD = 0;
 	public const TYPE_REMOVE = 1;
 
+	/** >= PROTOCOL_1_26_40 swapped these on the wire */
+	private const WIRE_TYPE_REMOVE_1_26_40 = 0;
+	private const WIRE_TYPE_ADD_1_26_40 = 1;
+
 	public int $type;
 	/** @var PlayerListEntry[] */
 	public array $entries = [];
@@ -64,9 +68,17 @@ class PlayerListPacket extends DataPacket implements ClientboundPacket{
 	}
 
 	protected function decodePayload(PacketSerializer $in) : void{
-		$this->type = $in->getByte();
+		//1.26.40 moved the type into each entry and swapped the add/remove values
+		$is2640 = $in->getProtocolId() >= ProtocolInfo::PROTOCOL_1_26_40;
+		if(!$is2640){
+			$this->type = $in->getByte();
+		}
 		$count = $in->getUnsignedVarInt();
 		for($i = 0; $i < $count; ++$i){
+			if($is2640){
+				$this->type = $in->getUnsignedVarInt() === self::WIRE_TYPE_ADD_1_26_40 ? self::TYPE_ADD : self::TYPE_REMOVE;
+				$in->getByte(); //sent twice, in the old numbering
+			}
 			$entry = new PlayerListEntry();
 
 			if($this->type === self::TYPE_ADD){
@@ -91,7 +103,7 @@ class PlayerListPacket extends DataPacket implements ClientboundPacket{
 
 			$this->entries[$i] = $entry;
 		}
-		if($this->type === self::TYPE_ADD){
+		if($this->type === self::TYPE_ADD && !$is2640){
 			for($i = 0; $i < $count; ++$i){
 				$this->entries[$i]->skinData->setVerified($in->getBool());
 			}
@@ -99,9 +111,16 @@ class PlayerListPacket extends DataPacket implements ClientboundPacket{
 	}
 
 	protected function encodePayload(PacketSerializer $out) : void{
-		$out->putByte($this->type);
+		$is2640 = $out->getProtocolId() >= ProtocolInfo::PROTOCOL_1_26_40;
+		if(!$is2640){
+			$out->putByte($this->type);
+		}
 		$out->putUnsignedVarInt(count($this->entries));
 		foreach($this->entries as $entry){
+			if($is2640){
+				$out->putUnsignedVarInt($this->type === self::TYPE_ADD ? self::WIRE_TYPE_ADD_1_26_40 : self::WIRE_TYPE_REMOVE_1_26_40);
+				$out->putByte($this->type);
+			}
 			if($this->type === self::TYPE_ADD){
 				$out->putUUID($entry->uuid);
 				$out->putActorUniqueId($entry->actorUniqueId);
@@ -122,7 +141,7 @@ class PlayerListPacket extends DataPacket implements ClientboundPacket{
 				$out->putUUID($entry->uuid);
 			}
 		}
-		if($this->type === self::TYPE_ADD){
+		if($this->type === self::TYPE_ADD && !$is2640){
 			foreach($this->entries as $entry){
 				$out->putBool($entry->skinData->isVerified());
 			}

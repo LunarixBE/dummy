@@ -49,7 +49,30 @@ class ResourcePackClientResponsePacket extends DataPacket implements Serverbound
 		return $result;
 	}
 
+	/** >= PROTOCOL_1_26_40 renumbered these 1..4 -> 0..3; the constants keep the old numbering */
+	private function getStatusId() : string{
+		return match($this->status){
+			self::STATUS_REFUSED => "cancel",
+			self::STATUS_SEND_PACKS => "downloading",
+			self::STATUS_HAVE_ALL_PACKS => "downloadingfinished",
+			self::STATUS_COMPLETED => "resourcepackstackfinished",
+			default => throw new \InvalidArgumentException("Unknown status " . $this->status)
+		};
+	}
+
 	protected function decodePayload(PacketSerializer $in) : void{
+		if($in->getProtocolId() >= ProtocolInfo::PROTOCOL_1_26_40){
+			$this->status = $in->getUnsignedVarInt() + 1;
+			$in->getString(); //string form of the status
+			$this->packIds = [];
+			if($this->status === self::STATUS_SEND_PACKS){
+				for($i = 0, $entryCount = $in->getUnsignedVarInt(); $i < $entryCount; ++$i){
+					$this->packIds[] = $in->getString();
+				}
+			}
+			return;
+		}
+
 		$this->status = $in->getByte();
 		$entryCount = $in->getLShort();
 		$this->packIds = [];
@@ -59,6 +82,18 @@ class ResourcePackClientResponsePacket extends DataPacket implements Serverbound
 	}
 
 	protected function encodePayload(PacketSerializer $out) : void{
+		if($out->getProtocolId() >= ProtocolInfo::PROTOCOL_1_26_40){
+			$out->putUnsignedVarInt($this->status - 1);
+			$out->putString($this->getStatusId());
+			if($this->status === self::STATUS_SEND_PACKS){
+				$out->putUnsignedVarInt(count($this->packIds));
+				foreach($this->packIds as $id){
+					$out->putString($id);
+				}
+			}
+			return;
+		}
+
 		$out->putByte($this->status);
 		$out->putLShort(count($this->packIds));
 		foreach($this->packIds as $id){

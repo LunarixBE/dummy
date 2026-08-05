@@ -23,6 +23,7 @@ declare(strict_types=1);
 
 namespace pocketmine\network\mcpe\protocol\types\inventory\stackresponse;
 
+use pocketmine\network\mcpe\protocol\ProtocolInfo;
 use pocketmine\network\mcpe\protocol\serializer\PacketSerializer;
 use function count;
 
@@ -57,7 +58,13 @@ final class ItemStackResponse{
 		$result = $in->getByte();
 		$requestId = $in->readItemStackRequestId();
 		$containerInfos = [];
-		if($result === self::RESULT_OK){
+		if($in->getProtocolId() >= ProtocolInfo::PROTOCOL_1_26_40){
+			if($in->getBool() && $in->getBool()){
+				for($i = 0, $len = $in->getUnsignedVarInt(); $i < $len; ++$i){
+					$containerInfos[] = ItemStackResponseContainerInfo::read($in);
+				}
+			}
+		}elseif($result === self::RESULT_OK){
 			for($i = 0, $len = $in->getUnsignedVarInt(); $i < $len; ++$i){
 				$containerInfos[] = ItemStackResponseContainerInfo::read($in);
 			}
@@ -68,6 +75,17 @@ final class ItemStackResponse{
 	public function write(PacketSerializer $out) : void{
 		$out->putByte($this->result);
 		$out->writeItemStackRequestId($this->requestId);
+		if($out->getProtocolId() >= ProtocolInfo::PROTOCOL_1_26_40){
+			$out->putBool($hasContainers = count($this->containerInfos) !== 0);
+			if($hasContainers){
+				$out->putBool(true);
+				$out->putUnsignedVarInt(count($this->containerInfos));
+				foreach($this->containerInfos as $containerInfo){
+					$containerInfo->write($out);
+				}
+			}
+			return;
+		}
 		if($this->result === self::RESULT_OK){
 			$out->putUnsignedVarInt(count($this->containerInfos));
 			foreach($this->containerInfos as $containerInfo){

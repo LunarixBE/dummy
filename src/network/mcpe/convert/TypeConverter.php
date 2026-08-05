@@ -57,6 +57,7 @@ use pocketmine\network\mcpe\protocol\types\inventory\ItemStack;
 use pocketmine\network\mcpe\protocol\types\inventory\ItemStackExtraData;
 use pocketmine\network\mcpe\protocol\types\inventory\ItemStackExtraDataShield;
 use pocketmine\network\mcpe\protocol\types\recipe\IntIdMetaItemDescriptor;
+use pocketmine\network\mcpe\protocol\types\recipe\NameItemDescriptor;
 use pocketmine\network\mcpe\protocol\types\recipe\RecipeIngredient as ProtocolRecipeIngredient;
 use pocketmine\network\mcpe\protocol\types\recipe\StringIdMetaItemDescriptor;
 use pocketmine\network\mcpe\protocol\types\recipe\TagItemDescriptor;
@@ -162,7 +163,9 @@ class TypeConverter{
 
 			$id = $this->itemTypeDictionary->fromStringId($stringId);
 			$meta = $meta === 0 && $stringId === $oldStringId ? self::RECIPE_INPUT_WILDCARD_META : $meta; // downgrader returns the same meta
-			$descriptor = new IntIdMetaItemDescriptor($id, $meta);
+			$descriptor = $this->protocolId >= ProtocolInfo::PROTOCOL_1_26_40
+				? new NameItemDescriptor($stringId, $meta)
+				: new IntIdMetaItemDescriptor($id, $meta);
 		}elseif($ingredient instanceof ExactRecipeIngredient){
 			$item = $ingredient->getItem();
 			[$id, $meta, $blockRuntimeId] = $this->itemTranslator->toNetworkId($item);
@@ -172,7 +175,9 @@ class TypeConverter{
 					throw new AssumptionFailedError("Every block state should have an associated meta value");
 				}
 			}
-			$descriptor = new IntIdMetaItemDescriptor($id, $meta);
+			$descriptor = $this->protocolId >= ProtocolInfo::PROTOCOL_1_26_40
+				? new NameItemDescriptor($this->itemTypeDictionary->fromIntId($id), $meta)
+				: new IntIdMetaItemDescriptor($id, $meta);
 		}elseif($ingredient instanceof TagWildcardRecipeIngredient){
 			if($this->protocolId < ProtocolInfo::PROTOCOL_1_19_30){
 				throw new \InvalidArgumentException("TagWildcardRecipeIngredient: not supported below 1.19.30");
@@ -195,7 +200,10 @@ class TypeConverter{
 			return new TagWildcardRecipeIngredient($descriptor->getTag());
 		}
 
-		if($descriptor instanceof IntIdMetaItemDescriptor){
+		if($descriptor instanceof NameItemDescriptor){
+			$stringId = $descriptor->getName();
+			$meta = $descriptor->getAuxValue();
+		}elseif($descriptor instanceof IntIdMetaItemDescriptor){
 			$stringId = $this->itemTypeDictionary->fromIntId($descriptor->getId());
 			$meta = $descriptor->getMeta();
 		}elseif($descriptor instanceof StringIdMetaItemDescriptor){

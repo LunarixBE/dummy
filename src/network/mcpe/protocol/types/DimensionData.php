@@ -25,6 +25,8 @@ namespace pocketmine\network\mcpe\protocol\types;
 
 use pocketmine\network\mcpe\protocol\ProtocolInfo;
 use pocketmine\network\mcpe\protocol\serializer\PacketSerializer;
+use Ramsey\Uuid\Uuid;
+use Ramsey\Uuid\UuidInterface;
 
 final class DimensionData{
 
@@ -32,7 +34,9 @@ final class DimensionData{
 		private int $maxHeight,
 		private int $minHeight,
 		private int $generator,
-		private int $dimensionType = DimensionIds::OVERWORLD
+		private int $dimensionType = DimensionIds::OVERWORLD,
+		/** >= PROTOCOL_1_26_40 */
+		private ?UuidInterface $packId = null
 	){}
 
 	public function getMaxHeight() : int{ return $this->maxHeight; }
@@ -43,6 +47,9 @@ final class DimensionData{
 
 	public function getDimensionType() : int{ return $this->dimensionType; }
 
+	/** >= PROTOCOL_1_26_40 */
+	public function getPackId() : ?UuidInterface{ return $this->packId; }
+
 	public static function read(PacketSerializer $in, ?int $protocolId = null) : self{
 		$protocolId ??= $in->getProtocolId();
 		$maxHeight = $in->getVarInt();
@@ -51,8 +58,11 @@ final class DimensionData{
 		if($protocolId >= ProtocolInfo::PROTOCOL_1_26_20){
 			$dimensionType = $in->getVarInt();
 		}
+		if($protocolId >= ProtocolInfo::PROTOCOL_1_26_40){
+			$packId = $in->getUUID();
+		}
 
-		return new self($maxHeight, $minHeight, $generator, $dimensionType ?? DimensionIds::OVERWORLD);
+		return new self($maxHeight, $minHeight, $generator, $dimensionType ?? DimensionIds::OVERWORLD, $packId ?? null);
 	}
 
 	public function write(PacketSerializer $out, ?int $protocolId = null) : void{
@@ -62,6 +72,9 @@ final class DimensionData{
 		$out->putVarInt($this->generator);
 		if($protocolId >= ProtocolInfo::PROTOCOL_1_26_20){
 			$out->putVarInt($this->dimensionType);
+		}
+		if($protocolId >= ProtocolInfo::PROTOCOL_1_26_40){
+			$out->putUUID($this->packId ?? Uuid::fromString(Uuid::NIL));
 		}
 	}
 }

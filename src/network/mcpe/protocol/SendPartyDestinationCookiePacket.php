@@ -29,6 +29,11 @@ class SendPartyDestinationCookiePacket extends DataPacket implements Clientbound
 	public const NETWORK_ID = ProtocolInfo::SEND_PARTY_DESTINATION_COOKIE_PACKET;
 
 	private string $cookie;
+	/** >= PROTOCOL_1_26_40, sent as a byte */
+	public const INTENT_NOTIFY = 0;
+	public const INTENT_OPT_IN = 1;
+	public const INTENT_OPT_OUT = 2;
+
 	private string $intent;
 	private string $destinationName;
 
@@ -51,13 +56,18 @@ class SendPartyDestinationCookiePacket extends DataPacket implements Clientbound
 
 	protected function decodePayload(PacketSerializer $in) : void{
 		$this->cookie = $in->getString();
-		$this->intent = $in->getString();
+		//kept as a string so the field type stays stable across protocols
+		$this->intent = $in->getProtocolId() >= ProtocolInfo::PROTOCOL_1_26_40 ? (string) $in->getByte() : $in->getString();
 		$this->destinationName = $in->getString();
 	}
 
 	protected function encodePayload(PacketSerializer $out) : void{
 		$out->putString($this->cookie);
-		$out->putString($this->intent);
+		if($out->getProtocolId() >= ProtocolInfo::PROTOCOL_1_26_40){
+			$out->putByte((int) $this->intent);
+		}else{
+			$out->putString($this->intent);
+		}
 		$out->putString($this->destinationName);
 	}
 

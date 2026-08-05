@@ -30,7 +30,7 @@ class AnvilDamagePacket extends DataPacket implements ServerboundPacket{
 	public const NETWORK_ID = ProtocolInfo::ANVIL_DAMAGE_PACKET;
 
 	private BlockPosition $blockPosition;
-	private int $damageAmount;
+	private int $damageAmount = 0;
 
 	/**
 	 * @generate-create-func
@@ -49,12 +49,16 @@ class AnvilDamagePacket extends DataPacket implements ServerboundPacket{
 	public function getBlockPosition() : BlockPosition{ return $this->blockPosition; }
 
 	protected function decodePayload(PacketSerializer $in) : void{
-		$this->damageAmount = $in->getByte();
+		if($in->getProtocolId() < ProtocolInfo::PROTOCOL_1_26_40){
+			$this->damageAmount = $in->getByte();
+		}
 		$this->blockPosition = $in->getBlockPosition($in->getProtocolId() >= ProtocolInfo::PROTOCOL_1_26_10);
 	}
 
 	protected function encodePayload(PacketSerializer $out) : void{
-		$out->putByte($this->damageAmount);
+		if($out->getProtocolId() < ProtocolInfo::PROTOCOL_1_26_40){
+			$out->putByte($this->damageAmount);
+		}
 		$out->putBlockPosition($this->blockPosition, $out->getProtocolId() >= ProtocolInfo::PROTOCOL_1_26_10);
 	}
 

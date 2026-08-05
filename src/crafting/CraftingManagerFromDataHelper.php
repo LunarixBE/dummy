@@ -38,6 +38,8 @@ use pocketmine\data\SavedDataLoadingException;
 use pocketmine\errorhandler\ErrorToExceptionHandler;
 use pocketmine\item\Item;
 use pocketmine\nbt\LittleEndianNbtSerializer;
+use pocketmine\nbt\tag\CompoundTag;
+use pocketmine\network\mcpe\convert\TypeConverter;
 use pocketmine\utils\Filesystem;
 use pocketmine\utils\Utils;
 use pocketmine\world\format\io\GlobalItemDataHandlers;
@@ -46,10 +48,24 @@ use function base64_decode;
 use function count;
 use function get_debug_type;
 use function is_array;
+use function is_int;
 use function is_object;
+use function is_string;
 use function json_decode;
 
 final class CraftingManagerFromDataHelper{
+
+	/** recipe types as they appear in the 1.26.40+ recipes.json */
+	private const NETWORK_RECIPE_TYPE_SHAPED = 0;
+	private const NETWORK_RECIPE_TYPE_SHAPELESS = 1;
+	private const NETWORK_RECIPE_TYPE_MULTI = 2;
+	private const NETWORK_RECIPE_TYPE_USER_DATA_SHAPELESS = 3;
+	private const NETWORK_RECIPE_TYPE_SMITHING_TRANSFORM = 6;
+	private const NETWORK_RECIPE_TYPE_SMITHING_TRIM = 7;
+
+	private const NETWORK_INGREDIENT_WILDCARD_META = 0x7fff;
+
+	private const LEGACY_ALIAS_MAX_META = 15;
 
 	private static function deserializeIngredient(RecipeIngredientData $data) : ?RecipeIngredient{
 		if(isset($data->count) && $data->count !== 1){
@@ -73,7 +89,7 @@ final class CraftingManagerFromDataHelper{
 			$data->name,
 			$meta,
 			$data->count ?? null,
-			$data->block_states ?? null,
+			self::decodeNbtField($data->block_states ?? null),
 			null,
 			[],
 			[]
@@ -91,45 +107,52 @@ final class CraftingManagerFromDataHelper{
 			$data->name,
 			$data->meta ?? null,
 			$data->count ?? null,
-			$data->block_states ?? null,
-			$data->nbt ?? null,
+			self::decodeNbtField($data->block_states ?? null),
+			self::decodeNbtField($data->nbt ?? null),
 			$data->can_place_on ?? [],
 			$data->can_destroy ?? []
 		);
 	}
 
+	private static function decodeNbtField(?string $raw) : ?CompoundTag{
+		return $raw === null ? null : (new LittleEndianNbtSerializer())
+			->read(ErrorToExceptionHandler::trapAndRemoveFalse(fn() => base64_decode($raw, true)))
+			->mustGetCompoundTag();
+	}
+
 	/**
+	 * Deserializes an item stack described by string ID + meta, the way network recipe and creative data does.
+	 * Blockitems without explicit blockstates get theirs looked up from the block palette by meta.
+	 *
 	 * @param string[] $canPlaceOn
 	 * @param string[] $canDestroy
 	 */
-	private static function deserializeItemStackFromFields(string $name, ?int $meta, ?int $count, ?string $blockStatesRaw, ?string $nbtRaw, array $canPlaceOn, array $canDestroy) : ?Item{
-		$meta ??= 0;
+	public static function deserializeItemStackFromFields(string $name, ?int $meta, ?int $count, ?CompoundTag $blockStatesTag, ?CompoundTag $nbt, array $canPlaceOn = [], array $canDestroy = []) : ?Item{
 		$count ??= 1;
 
 		$blockName = BlockItemIdMap::getInstance()->lookupBlockId($name);
 		if($blockName !== null){
-			if($meta !== 0){
-				throw new SavedDataLoadingException("Meta should not be specified for blockitems");
+			if($blockStatesTag !== null){
+				$blockStateData = BlockStateData::current($blockName, $blockStatesTag->getValue());
+			}else{
+				//look up the state from the network block palette
+				$dictionary = TypeConverter::getInstance()->getBlockTranslator()->getBlockStateDictionary();
+				$stateId = $dictionary->lookupStateIdFromIdMeta($blockName, $meta ?? 0) ?? $dictionary->lookupStateIdFromIdMeta($blockName, 0);
+				if($stateId === null){
+					//unknown block
+					return null;
+				}
+				$blockStateData = $dictionary->generateDataFromStateId($stateId);
 			}
-			$blockStatesTag = $blockStatesRaw === null ?
-				[] :
-				(new LittleEndianNbtSerializer())
-					->read(ErrorToExceptionHandler::trapAndRemoveFalse(fn() => base64_decode($blockStatesRaw, true)))
-					->mustGetCompoundTag()
-					->getValue();
-			$blockStateData = BlockStateData::current($blockName, $blockStatesTag);
+			$meta = 0;
 		}else{
 			$blockStateData = null;
 		}
 
-		$nbt = $nbtRaw === null ? null : (new LittleEndianNbtSerializer())
-			->read(ErrorToExceptionHandler::trapAndRemoveFalse(fn() => base64_decode($nbtRaw, true)))
-			->mustGetCompoundTag();
-
 		$itemStackData = new SavedItemStackData(
 			new SavedItemData(
 				$name,
-				$meta,
+				$meta ?? 0,
 				$blockStateData,
 				$nbt
 			),
@@ -325,6 +348,299 @@ final class CraftingManagerFromDataHelper{
 		}
 
 		//TODO: smithing
+
+		return $result;
+	}
+
+	private static function deserializeComplexAliasIngredient(string $aliasName) : ?RecipeIngredient{
+		$idMetaUpgrader = GlobalItemDataHandlers::getUpgrader()->getIdMetaUpgrader();
+
+		$items = [];
+		$seenIds = [];
+		for($meta = 0; $meta <= self::LEGACY_ALIAS_MAX_META; $meta++){
+			[$newId, ] = $idMetaUpgrader->upgrade($aliasName, $meta);
+			if(isset($seenIds[$newId])){
+				continue;
+			}
+			$seenIds[$newId] = true;
+
+			$item = self::deserializeItemStackFromFields($newId, 0, 1, null, null);
+			if($item !== null){ //unknown items (e.g. deprecated placeholders) are skipped
+				$items[] = $item;
+			}
+		}
+
+		if(count($items) === 0){
+			return null;
+		}
+		return count($items) === 1 ?
+			new ExactRecipeIngredient($items[0]) :
+			new ComplexAliasRecipeIngredient($aliasName, $items);
+	}
+
+	/**
+	 * @param mixed[] $data
+	 */
+	private static function deserializeNetworkIngredient(array $data) : ?RecipeIngredient{
+		$type = $data["type"] ?? null;
+		if(!is_string($type)){
+			throw new SavedDataLoadingException("Recipe ingredient should have a string type");
+		}
+		$count = $data["count"] ?? 1;
+		if($count !== 1){
+			//every case we've seen so far where this isn't the case, it's been a bug and the count was ignored anyway
+			throw new SavedDataLoadingException("Recipe inputs should have a count of exactly 1");
+		}
+
+		if($type === "item_tag"){
+			if(!isset($data["itemTag"]) || !is_string($data["itemTag"])){
+				throw new SavedDataLoadingException("item_tag ingredient should have a string itemTag");
+			}
+			return new TagWildcardRecipeIngredient($data["itemTag"]);
+		}
+
+		if($type === "complex_alias"){
+			if(!isset($data["name"]) || !is_string($data["name"])){
+				throw new SavedDataLoadingException("complex_alias ingredient should have a string name");
+			}
+			return self::deserializeComplexAliasIngredient($data["name"]);
+		}
+
+		if($type !== "default" && $type !== "name"){
+			throw new SavedDataLoadingException("Unsupported recipe ingredient type \"$type\"");
+		}
+
+		if(!isset($data["itemId"]) || !is_string($data["itemId"])){
+			throw new SavedDataLoadingException("default ingredient should have a string itemId");
+		}
+		$meta = $data["auxValue"] ?? 0;
+		if(!is_int($meta)){
+			throw new SavedDataLoadingException("default ingredient auxValue should be an int");
+		}
+
+		if($meta === self::NETWORK_INGREDIENT_WILDCARD_META || $meta === -1){
+			//this could be an unimplemented item, but it doesn't really matter, since the item shouldn't be able to
+			//be obtained anyway - filtering unknown items is only really important for outputs, to prevent players
+			//obtaining them
+			return new MetaWildcardRecipeIngredient($data["itemId"]);
+		}
+
+		$itemStack = self::deserializeItemStackFromFields($data["itemId"], $meta, 1, null, null);
+		if($itemStack === null){
+			//probably unknown item
+			return null;
+		}
+		return new ExactRecipeIngredient($itemStack);
+	}
+
+	/**
+	 * @param mixed[] $data
+	 */
+	private static function deserializeNetworkItemStack(array $data) : ?Item{
+		if(!isset($data["id"]) || !is_string($data["id"])){
+			throw new SavedDataLoadingException("Recipe output should have a string id");
+		}
+		$nbt = null;
+		if(isset($data["nbt_b64"])){
+			if(!is_string($data["nbt_b64"])){
+				throw new SavedDataLoadingException("nbt_b64 should be a string");
+			}
+			$nbt = self::decodeNbtField($data["nbt_b64"]);
+		}
+
+		$damage = $data["damage"] ?? null;
+		$count = $data["count"] ?? null;
+		if(($damage !== null && !is_int($damage)) || ($count !== null && !is_int($count))){
+			throw new SavedDataLoadingException("damage and count should be ints");
+		}
+
+		return self::deserializeItemStackFromFields($data["id"], $damage, $count, null, $nbt);
+	}
+
+	/**
+	 * @param mixed[] $recipe
+	 */
+	private static function loadShapelessRecipe(CraftingManager $manager, array $recipe) : void{
+		$recipeType = match($recipe["block"] ?? null){
+			"crafting_table" => ShapelessRecipeType::CRAFTING,
+			"stonecutter" => ShapelessRecipeType::STONECUTTER,
+			"smithing_table" => ShapelessRecipeType::SMITHING,
+			"cartography_table" => ShapelessRecipeType::CARTOGRAPHY,
+			"furnace" => FurnaceType::FURNACE,
+			"blast_furnace" => FurnaceType::BLAST_FURNACE,
+			"smoker" => FurnaceType::SMOKER,
+			"campfire" => FurnaceType::CAMPFIRE,
+			"soul_campfire" => FurnaceType::SOUL_CAMPFIRE,
+			default => null
+		};
+		if($recipeType === null){
+			return;
+		}
+		if(!isset($recipe["input"]) || !is_array($recipe["input"]) || !isset($recipe["output"]) || !is_array($recipe["output"])){
+			throw new SavedDataLoadingException("Shapeless recipe should have input and output lists");
+		}
+		$inputs = [];
+		foreach($recipe["input"] as $inputData){
+			if(!is_array($inputData)){
+				throw new SavedDataLoadingException("Shapeless recipe input should be an object");
+			}
+			$input = self::deserializeNetworkIngredient($inputData);
+			if($input === null){ //unknown or unsupported input
+				return;
+			}
+			$inputs[] = $input;
+		}
+		$outputs = [];
+		foreach($recipe["output"] as $outputData){
+			if(!is_array($outputData)){
+				throw new SavedDataLoadingException("Shapeless recipe output should be an object");
+			}
+			$output = self::deserializeNetworkItemStack($outputData);
+			if($output === null){ //unknown output item
+				return;
+			}
+			$outputs[] = $output;
+		}
+		//TODO: check unlocking requirements - our current system doesn't support this
+
+		if($recipeType instanceof FurnaceType){
+			if(count($inputs) !== 1 || count($outputs) !== 1){
+				throw new SavedDataLoadingException("Furnace recipes must have exactly 1 input and 1 output");
+			}
+
+			$manager->getFurnaceRecipeManager($recipeType)->register(new FurnaceRecipe($outputs[0], $inputs[0]));
+		}else{
+			$manager->registerShapelessRecipe(new ShapelessRecipe($inputs, $outputs, $recipeType));
+		}
+	}
+
+	/**
+	 * @param mixed[] $recipe
+	 */
+	private static function loadShapedRecipe(CraftingManager $manager, array $recipe) : void{
+		if(($recipe["block"] ?? null) !== "crafting_table"){ //TODO: filter others out for now to avoid breaking economics
+			return;
+		}
+		if(!isset($recipe["input"]) || !is_array($recipe["input"]) || !isset($recipe["output"]) || !is_array($recipe["output"]) || !isset($recipe["shape"]) || !is_array($recipe["shape"])){
+			throw new SavedDataLoadingException("Shaped recipe should have input, output and shape");
+		}
+		$inputs = [];
+		foreach(Utils::promoteKeys($recipe["input"]) as $symbol => $inputData){
+			if(!is_string($symbol) || !is_array($inputData)){
+				throw new SavedDataLoadingException("Shaped recipe input should be a map of symbol => ingredient");
+			}
+			$input = self::deserializeNetworkIngredient($inputData);
+			if($input === null){ //unknown or unsupported input
+				return;
+			}
+			$inputs[$symbol] = $input;
+		}
+		$outputs = [];
+		foreach($recipe["output"] as $outputData){
+			if(!is_array($outputData)){
+				throw new SavedDataLoadingException("Shaped recipe output should be an object");
+			}
+			$output = self::deserializeNetworkItemStack($outputData);
+			if($output === null){ //unknown output item
+				return;
+			}
+			$outputs[] = $output;
+		}
+		$shape = [];
+		foreach($recipe["shape"] as $row){
+			if(!is_string($row)){
+				throw new SavedDataLoadingException("Shaped recipe shape should be a list of strings");
+			}
+			$shape[] = $row;
+		}
+		//TODO: check unlocking requirements - our current system doesn't support this
+		$manager->registerShapedRecipe(new ShapedRecipe($shape, $inputs, $outputs));
+	}
+
+	/** Builds a CraftingManager from a 1.26.40+ consolidated recipes.json. */
+	public static function makeFromNetworkData(string $filePath) : CraftingManager{
+		$data = json_decode(Filesystem::fileGetContents($filePath), true);
+		if(
+			!is_array($data) ||
+			!isset($data["recipes"], $data["potionMixes"], $data["containerMixes"]) ||
+			!is_array($data["recipes"]) || !is_array($data["potionMixes"]) || !is_array($data["containerMixes"])
+		){
+			throw new SavedDataLoadingException("$filePath should contain recipes, potionMixes and containerMixes lists");
+		}
+
+		$result = new CraftingManager();
+
+		foreach(Utils::promoteKeys($data["recipes"]) as $i => $recipe){
+			if(!is_array($recipe) || !isset($recipe["type"]) || !is_int($recipe["type"])){
+				throw new SavedDataLoadingException("Invalid recipe at index $i: expected object with int type");
+			}
+			try{
+				switch($recipe["type"]){
+					case self::NETWORK_RECIPE_TYPE_SHAPELESS:
+					case self::NETWORK_RECIPE_TYPE_USER_DATA_SHAPELESS:
+						self::loadShapelessRecipe($result, $recipe);
+						break;
+					case self::NETWORK_RECIPE_TYPE_SHAPED:
+						self::loadShapedRecipe($result, $recipe);
+						break;
+					case self::NETWORK_RECIPE_TYPE_MULTI:
+					case self::NETWORK_RECIPE_TYPE_SMITHING_TRANSFORM:
+					case self::NETWORK_RECIPE_TYPE_SMITHING_TRIM:
+						//TODO: not supported by the crafting system yet
+						break;
+				}
+			}catch(SavedDataLoadingException $e){
+				throw new SavedDataLoadingException("Invalid recipe at index $i: " . $e->getMessage(), 0, $e);
+			}
+		}
+
+		foreach(Utils::promoteKeys($data["potionMixes"]) as $i => $mix){
+			if(
+				!is_array($mix) ||
+				!isset($mix["inputId"], $mix["inputMeta"], $mix["reagentId"], $mix["reagentMeta"], $mix["outputId"], $mix["outputMeta"]) ||
+				!is_string($mix["inputId"]) || !is_int($mix["inputMeta"]) ||
+				!is_string($mix["reagentId"]) || !is_int($mix["reagentMeta"]) ||
+				!is_string($mix["outputId"]) || !is_int($mix["outputMeta"])
+			){
+				throw new SavedDataLoadingException("Invalid potion mix at index $i");
+			}
+			$input = self::deserializeItemStackFromFields($mix["inputId"], $mix["inputMeta"], 1, null, null);
+			$reagent = self::deserializeItemStackFromFields($mix["reagentId"], $mix["reagentMeta"], 1, null, null);
+			$output = self::deserializeItemStackFromFields($mix["outputId"], $mix["outputMeta"], 1, null, null);
+			if($input === null || $reagent === null || $output === null){
+				continue;
+			}
+			$result->registerPotionTypeRecipe(new PotionTypeRecipe(
+				new ExactRecipeIngredient($input),
+				new ExactRecipeIngredient($reagent),
+				$output
+			));
+		}
+
+		foreach(Utils::promoteKeys($data["containerMixes"]) as $i => $mix){
+			if(
+				!is_array($mix) ||
+				!isset($mix["inputId"], $mix["reagentId"], $mix["outputId"]) ||
+				!is_string($mix["inputId"]) || !is_string($mix["reagentId"]) || !is_string($mix["outputId"])
+			){
+				throw new SavedDataLoadingException("Invalid container mix at index $i");
+			}
+			$reagent = self::deserializeItemStackFromFields($mix["reagentId"], null, 1, null, null);
+			//TODO: this is a really awful way to just check if an ID is recognized ...
+			if(
+				$reagent === null ||
+				self::deserializeItemStackFromFields($mix["inputId"], null, 1, null, null) === null ||
+				self::deserializeItemStackFromFields($mix["outputId"], null, 1, null, null) === null
+			){
+				//unknown item
+				continue;
+			}
+			$result->registerPotionContainerChangeRecipe(new PotionContainerChangeRecipe(
+				$mix["inputId"],
+				new ExactRecipeIngredient($reagent),
+				$mix["outputId"]
+			));
+		}
 
 		return $result;
 	}

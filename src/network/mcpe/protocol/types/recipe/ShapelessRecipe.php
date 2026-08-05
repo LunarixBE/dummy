@@ -44,7 +44,7 @@ final class ShapelessRecipe extends RecipeWithTypeId{
 		private UuidInterface $uuid,
 		private string $blockName,
 		private int $priority,
-		private RecipeUnlockingRequirement $unlockingRequirement,
+		private ?RecipeUnlockingRequirement $unlockingRequirement,
 		private int $recipeNetId
 	){
 		parent::__construct($typeId);
@@ -82,7 +82,7 @@ final class ShapelessRecipe extends RecipeWithTypeId{
 		return $this->priority;
 	}
 
-	public function getUnlockingRequirement() : RecipeUnlockingRequirement{ return $this->unlockingRequirement; }
+	public function getUnlockingRequirement() : ?RecipeUnlockingRequirement{ return $this->unlockingRequirement; }
 
 	public function getRecipeNetId() : int{
 		return $this->recipeNetId;
@@ -101,13 +101,15 @@ final class ShapelessRecipe extends RecipeWithTypeId{
 		$uuid = $in->getUUID();
 		$block = $in->getString();
 		$priority = $in->getVarInt();
-		if($in->getProtocolId() >= ProtocolInfo::PROTOCOL_1_21_0){
+		if($in->getProtocolId() >= ProtocolInfo::PROTOCOL_1_26_40){
+			$unlockingRequirement = $in->getBool() ? RecipeUnlockingRequirement::read($in) : null;
+		}elseif($in->getProtocolId() >= ProtocolInfo::PROTOCOL_1_21_0){
 			$unlockingRequirement = RecipeUnlockingRequirement::read($in);
 		}
 
 		$recipeNetId = $in->readRecipeNetId();
 
-		return new self($recipeType, $recipeId, $input, $output, $uuid, $block, $priority, $unlockingRequirement ?? new RecipeUnlockingRequirement(null), $recipeNetId);
+		return new self($recipeType, $recipeId, $input, $output, $uuid, $block, $priority, $unlockingRequirement ?? null, $recipeNetId);
 	}
 
 	public function encode(PacketSerializer $out) : void{
@@ -125,8 +127,12 @@ final class ShapelessRecipe extends RecipeWithTypeId{
 		$out->putUUID($this->uuid);
 		$out->putString($this->blockName);
 		$out->putVarInt($this->priority);
-		if($out->getProtocolId() >= ProtocolInfo::PROTOCOL_1_21_0){
-			$this->unlockingRequirement->write($out);
+		if($out->getProtocolId() >= ProtocolInfo::PROTOCOL_1_26_40){
+			$out->putBool($this->unlockingRequirement !== null);
+			$this->unlockingRequirement?->write($out);
+		}elseif($out->getProtocolId() >= ProtocolInfo::PROTOCOL_1_21_0){
+			//older protocols can't express "no requirement"
+			($this->unlockingRequirement ?? new RecipeUnlockingRequirement(null))->write($out);
 		}
 
 		$out->writeRecipeNetId($this->recipeNetId);

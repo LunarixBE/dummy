@@ -59,7 +59,7 @@ class ReleaseItemTransactionData extends TransactionData{
 	}
 
 	protected function decodeData(PacketSerializer $stream) : void{
-		$this->actionType = $stream->getProtocolId() >= ProtocolInfo::PROTOCOL_1_26_30
+		$this->actionType = $stream->getProtocolId() >= ProtocolInfo::PROTOCOL_1_26_30 && $stream->getProtocolId() < ProtocolInfo::PROTOCOL_1_26_40
 			? $stream->getVarInt()
 			: $stream->getUnsignedVarInt();
 		$this->hotbarSlot = $stream->getVarInt();
@@ -70,7 +70,7 @@ class ReleaseItemTransactionData extends TransactionData{
 	}
 
 	protected function encodeData(PacketSerializer $stream) : void{
-		if($stream->getProtocolId() >= ProtocolInfo::PROTOCOL_1_26_30){
+		if($stream->getProtocolId() >= ProtocolInfo::PROTOCOL_1_26_30 && $stream->getProtocolId() < ProtocolInfo::PROTOCOL_1_26_40){
 			$stream->putVarInt($this->actionType);
 		}else{
 			$stream->putUnsignedVarInt($this->actionType);

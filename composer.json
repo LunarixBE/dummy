@@ -10,6 +10,14 @@
 		{
 			"type": "vcs",
 			"url": "https://github.com/LunarixBE/locale-data.git"
+		},
+		{
+			"type": "vcs",
+			"url": "https://github.com/ZyroNetworkMC/BedrockBlockUpgradeSchema.git"
+		},
+		{
+			"type": "vcs",
+			"url": "https://github.com/ZyroNetworkMC/BedrockItemUpgradeSchema.git"
 		}
 	],
 
@@ -18,8 +26,8 @@
 		"adhocore/json-comment": "^1.2.1",
 		"brick/math": "^0.13.1",
 		"netresearch/jsonmapper": "^5.0",
-		"pocketmine/bedrock-block-upgrade-schema": "^5.2.0",
-		"pocketmine/bedrock-item-upgrade-schema": "^1.16.0",
+		"pocketmine/bedrock-block-upgrade-schema": "1.26.40",
+		"pocketmine/bedrock-item-upgrade-schema": "1.26.40",
 		"pocketmine/binaryutils": "^0.2.6",
 		"pocketmine/callback-validator": "^1.0.3",
 		"pocketmine/color": "^0.3.1",

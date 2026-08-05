@@ -48,6 +48,10 @@ final class BlockTranslator{
 			self::CANONICAL_BLOCK_STATES_PATH => '',
 			self::BLOCK_STATE_META_MAP_PATH => '',
 		],
+		ProtocolInfo::PROTOCOL_1_26_30 => [
+			self::CANONICAL_BLOCK_STATES_PATH => '-1.26.30',
+			self::BLOCK_STATE_META_MAP_PATH => '-1.26.30',
+		],
 		ProtocolInfo::PROTOCOL_1_26_20 => [
 			self::CANONICAL_BLOCK_STATES_PATH => '-1.26.20',
 			self::BLOCK_STATE_META_MAP_PATH => '-1.26.20',
@@ -276,8 +280,17 @@ final class BlockTranslator{
 
 	public static function loadFromProtocolId(int $protocolId) : BlockTranslator{
 		self::setupHashProtocols();
-		$canonicalBlockStatesRaw = Filesystem::fileGetContents(str_replace(".json", self::PATHS[$protocolId][self::CANONICAL_BLOCK_STATES_PATH] . ".json", BedrockDataFiles::CANONICAL_BLOCK_STATES_JSON));
 		$metaMappingRaw = Filesystem::fileGetContents(str_replace(".json", self::PATHS[$protocolId][self::BLOCK_STATE_META_MAP_PATH] . ".json", BedrockDataFiles::BLOCK_STATE_META_MAP_JSON));
+
+		if($protocolId >= ProtocolInfo::PROTOCOL_1_26_40){
+			//1.26.40 replaced canonical_block_states.nbt with block_palette.nbt
+			return new self(
+				BlockStateDictionary::loadFromBlockPalette(Filesystem::fileGetContents(BedrockDataFiles::BLOCK_PALETTE_NBT), $metaMappingRaw),
+				GlobalBlockStateHandlers::getSerializer(),
+			);
+		}
+
+		$canonicalBlockStatesRaw = Filesystem::fileGetContents(str_replace(".json", self::PATHS[$protocolId][self::CANONICAL_BLOCK_STATES_PATH] . ".json", BedrockDataFiles::CANONICAL_BLOCK_STATES_JSON));
 		$isHash = isset(self::$HASH_PROTOCOLS[$protocolId]);
 		return new self(
 			BlockStateDictionary::loadFromString($canonicalBlockStatesRaw, $metaMappingRaw, $isHash, $isHash ? self::$HASH_PROTOCOLS[$protocolId] : null),

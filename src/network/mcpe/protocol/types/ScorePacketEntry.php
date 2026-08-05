@@ -24,13 +24,15 @@ declare(strict_types=1);
 namespace pocketmine\network\mcpe\protocol\types;
 
 class ScorePacketEntry{
+	/** >= PROTOCOL_1_26_40, where removal became a regular entry type */
+	public const TYPE_REMOVE = 0;
 	public const TYPE_PLAYER = 1;
 	public const TYPE_ENTITY = 2;
 	public const TYPE_FAKE_PLAYER = 3;
 
 	public int $scoreboardId;
-	public string $objectiveName;
-	public int $score;
+	public string $objectiveName = "";
+	public int $score = 0;
 	public int $type;
 	/** @var int|null (if type entity or player) */
 	public ?int $actorUniqueId;

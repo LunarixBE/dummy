@@ -23,6 +23,7 @@ declare(strict_types=1);
 
 namespace pocketmine\network\mcpe\protocol\types;
 
+use pocketmine\network\mcpe\protocol\ProtocolInfo;
 use pocketmine\network\mcpe\protocol\serializer\PacketSerializer;
 
 final class SubChunkPacketEntryWithoutCache{
@@ -34,10 +35,17 @@ final class SubChunkPacketEntryWithoutCache{
 	public function getBase() : SubChunkPacketEntryCommon{ return $this->base; }
 
 	public static function read(PacketSerializer $in) : self{
-		return new self(SubChunkPacketEntryCommon::read($in, false));
+		$base = SubChunkPacketEntryCommon::read($in, false);
+		if($in->getProtocolId() >= ProtocolInfo::PROTOCOL_1_26_40 && $in->getBool()){
+			$in->getLLong(); //blob hash
+		}
+		return new self($base);
 	}
 
 	public function write(PacketSerializer $out) : void{
 		$this->base->write($out, false);
+		if($out->getProtocolId() >= ProtocolInfo::PROTOCOL_1_26_40){
+			$out->putBool(false);
+		}
 	}
 }

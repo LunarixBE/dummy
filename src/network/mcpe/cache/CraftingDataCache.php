@@ -40,6 +40,8 @@ use pocketmine\network\mcpe\protocol\types\recipe\CraftingRecipeBlockName;
 use pocketmine\network\mcpe\protocol\types\recipe\FurnaceRecipe as ProtocolFurnaceRecipe;
 use pocketmine\network\mcpe\protocol\types\recipe\FurnaceRecipeBlockName;
 use pocketmine\network\mcpe\protocol\types\recipe\IntIdMetaItemDescriptor;
+use pocketmine\network\mcpe\protocol\types\recipe\ItemDescriptor;
+use pocketmine\network\mcpe\protocol\types\recipe\NameItemDescriptor;
 use pocketmine\network\mcpe\protocol\types\recipe\PotionContainerChangeRecipe as ProtocolPotionContainerChangeRecipe;
 use pocketmine\network\mcpe\protocol\types\recipe\PotionTypeRecipe as ProtocolPotionTypeRecipe;
 use pocketmine\network\mcpe\protocol\types\recipe\RecipeUnlockingRequirement;
@@ -92,7 +94,10 @@ final class CraftingDataCache{
 		$itemTagDowngrader = ItemTagDowngrader::getInstance($this->protocolId);
 		$recipesWithTypeIds = [];
 
-		$noUnlockingRequirement = new RecipeUnlockingRequirement(null);
+		$noUnlockingRequirement = new RecipeUnlockingRequirement(
+			null,
+			$this->getProtocolId() >= ProtocolInfo::PROTOCOL_1_26_40 ? RecipeUnlockingRequirement::CONTEXT_ALWAYS_UNLOCKED : RecipeUnlockingRequirement::CONTEXT_NONE
+		);
 		foreach($manager->getCraftingRecipeIndex() as $index => $recipe){
 			$recipeNetId = $index + self::RECIPE_ID_OFFSET;
 			if($recipe instanceof ShapelessRecipe){
@@ -213,17 +218,14 @@ final class CraftingDataCache{
 		$potionTypeRecipes = [];
 		foreach($manager->getPotionTypeRecipes() as $recipe){
 			try{
-				$input = $converter->coreRecipeIngredientToNet($recipe->getInput())->getDescriptor();
-				$ingredient = $converter->coreRecipeIngredientToNet($recipe->getIngredient())->getDescriptor();
-				if(!$input instanceof IntIdMetaItemDescriptor || !$ingredient instanceof IntIdMetaItemDescriptor){
-					throw new AssumptionFailedError();
-				}
+				[$inputId, $inputMeta] = self::descriptorToIdMeta($converter, $converter->coreRecipeIngredientToNet($recipe->getInput())->getDescriptor());
+				[$ingredientId, $ingredientMeta] = self::descriptorToIdMeta($converter, $converter->coreRecipeIngredientToNet($recipe->getIngredient())->getDescriptor());
 				$output = $converter->coreItemStackToNet($recipe->getOutput());
 				$potionTypeRecipes[] = new ProtocolPotionTypeRecipe(
-					$input->getId(),
-					$input->getMeta(),
-					$ingredient->getId(),
-					$ingredient->getMeta(),
+					$inputId,
+					$inputMeta,
+					$ingredientId,
+					$ingredientMeta,
 					$output->getId(),
 					$output->getMeta()
 				);
@@ -237,14 +239,11 @@ final class CraftingDataCache{
 		foreach($manager->getPotionContainerChangeRecipes() as $recipe){
 			try{
 				$input = $itemTypeDictionary->fromStringId($recipe->getInputItemId());
-				$ingredient = $converter->coreRecipeIngredientToNet($recipe->getIngredient())->getDescriptor();
-				if(!$ingredient instanceof IntIdMetaItemDescriptor){
-					throw new AssumptionFailedError();
-				}
+				[$ingredientId, ] = self::descriptorToIdMeta($converter, $converter->coreRecipeIngredientToNet($recipe->getIngredient())->getDescriptor());
 				$output = $itemTypeDictionary->fromStringId($recipe->getOutputItemId());
 				$potionContainerChangeRecipes[] = new ProtocolPotionContainerChangeRecipe(
 					$input,
-					$ingredient->getId(),
+					$ingredientId,
 					$output
 				);
 			}catch(\InvalidArgumentException|ItemTypeSerializeException){
@@ -254,5 +253,21 @@ final class CraftingDataCache{
 
 		Timings::$craftingDataCacheRebuild->stopTiming();
 		return CraftingDataPacket::create($recipesWithTypeIds, $potionTypeRecipes, $potionContainerChangeRecipes, [], true);
+	}
+
+	/**
+	 * Potion recipes are always sent as numeric item IDs, but 1.26.40 hands us name-based descriptors.
+	 *
+	 * @phpstan-return array{int, int}
+	 */
+	private static function descriptorToIdMeta(TypeConverter $converter, ?ItemDescriptor $descriptor) : array{
+		if($descriptor instanceof IntIdMetaItemDescriptor){
+			return [$descriptor->getId(), $descriptor->getMeta()];
+		}
+		if($descriptor instanceof NameItemDescriptor){
+			return [$converter->getItemTypeDictionary()->fromStringId($descriptor->getName()), $descriptor->getAuxValue()];
+		}
+
+		throw new AssumptionFailedError("Potion recipe ingredients must resolve to a concrete item ID");
 	}
 }

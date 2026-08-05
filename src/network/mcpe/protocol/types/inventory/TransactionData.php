@@ -117,6 +117,12 @@ abstract class TransactionData{
 	final public function encode(PacketSerializer $stream) : void{
 
 		if($stream->getProtocolId() >= ProtocolInfo::PROTOCOL_1_26_30){
+			//1.26.40 sends no payload at all for an actionless transaction
+			if($stream->getProtocolId() >= ProtocolInfo::PROTOCOL_1_26_40 && count($this->actions) === 0){
+				$stream->putBool(false);
+				return;
+			}
+
 			//the dummy optional bool for trData is always present (1) in the standalone transaction format
 			$stream->putBool(true);
 			$stream->putUnsignedVarInt(count($this->actions));

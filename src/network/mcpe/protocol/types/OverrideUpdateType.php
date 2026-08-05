@@ -33,4 +33,14 @@ enum OverrideUpdateType : int{
 	case REMOVE_OVERRIDE = 1;
 	case SET_INT_OVERRIDE = 2;
 	case SET_FLOAT_OVERRIDE = 3;
+
+	/** >= PROTOCOL_1_26_40, sent alongside the numeric type */
+	public function getId() : string{
+		return match($this){
+			self::CLEAR_OVERRIDES => "clearoverrides",
+			self::REMOVE_OVERRIDE => "removeoverride",
+			self::SET_INT_OVERRIDE => "setintoverride",
+			self::SET_FLOAT_OVERRIDE => "setfloatoverride",
+		};
+	}
 }

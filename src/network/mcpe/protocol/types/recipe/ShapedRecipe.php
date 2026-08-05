@@ -27,7 +27,9 @@ use pocketmine\network\mcpe\protocol\ProtocolInfo;
 use pocketmine\network\mcpe\protocol\serializer\PacketSerializer;
 use pocketmine\network\mcpe\protocol\types\inventory\ItemStack;
 use Ramsey\Uuid\UuidInterface;
+use function array_chunk;
 use function count;
+use function max;
 
 final class ShapedRecipe extends RecipeWithTypeId{
 	private string $blockName;
@@ -47,7 +49,7 @@ final class ShapedRecipe extends RecipeWithTypeId{
 		string $blockType, //TODO: rename this
 		private int $priority,
 		private bool $symmetric,
-		private RecipeUnlockingRequirement $unlockingRequirement,
+		private ?RecipeUnlockingRequirement $unlockingRequirement,
 		private int $recipeNetId
 	){
 		parent::__construct($typeId);
@@ -108,7 +110,7 @@ final class ShapedRecipe extends RecipeWithTypeId{
 
 	public function isSymmetric() : bool{ return $this->symmetric; }
 
-	public function getUnlockingRequirement() : RecipeUnlockingRequirement{ return $this->unlockingRequirement; }
+	public function getUnlockingRequirement() : ?RecipeUnlockingRequirement{ return $this->unlockingRequirement; }
 
 	public function getRecipeNetId() : int{
 		return $this->recipeNetId;
@@ -119,9 +121,18 @@ final class ShapedRecipe extends RecipeWithTypeId{
 		$width = $in->getVarInt();
 		$height = $in->getVarInt();
 		$input = [];
-		for($row = 0; $row < $height; ++$row){
-			for($column = 0; $column < $width; ++$column){
-				$input[$row][$column] = $in->getRecipeIngredient();
+		if($in->getProtocolId() >= ProtocolInfo::PROTOCOL_1_26_40){
+			//1.26.40 sends the grid as one flat list
+			$ingredients = [];
+			for($i = 0, $ingredientCount = $in->getUnsignedVarInt(); $i < $ingredientCount; ++$i){
+				$ingredients[] = $in->getRecipeIngredient();
+			}
+			$input = array_chunk($ingredients, max(1, $width));
+		}else{
+			for($row = 0; $row < $height; ++$row){
+				for($column = 0; $column < $width; ++$column){
+					$input[$row][$column] = $in->getRecipeIngredient();
+				}
 			}
 		}
 
@@ -135,20 +146,25 @@ final class ShapedRecipe extends RecipeWithTypeId{
 		if($in->getProtocolId() >= ProtocolInfo::PROTOCOL_1_20_80){
 			$symmetric = $in->getBool();
 
-			if($in->getProtocolId() >= ProtocolInfo::PROTOCOL_1_21_0){
+			if($in->getProtocolId() >= ProtocolInfo::PROTOCOL_1_26_40){
+				$unlockingRequirement = $in->getBool() ? RecipeUnlockingRequirement::read($in) : null;
+			}elseif($in->getProtocolId() >= ProtocolInfo::PROTOCOL_1_21_0){
 				$unlockingRequirement = RecipeUnlockingRequirement::read($in);
 			}
 		}
 
 		$recipeNetId = $in->readRecipeNetId();
 
-		return new self($recipeType, $recipeId, $input, $output, $uuid, $block, $priority, $symmetric ?? true, $unlockingRequirement ?? new RecipeUnlockingRequirement(null), $recipeNetId);
+		return new self($recipeType, $recipeId, $input, $output, $uuid, $block, $priority, $symmetric ?? true, $unlockingRequirement ?? null, $recipeNetId);
 	}
 
 	public function encode(PacketSerializer $out) : void{
 		$out->putString($this->recipeId);
 		$out->putVarInt($this->getWidth());
 		$out->putVarInt($this->getHeight());
+		if($out->getProtocolId() >= ProtocolInfo::PROTOCOL_1_26_40){
+			$out->putUnsignedVarInt($this->getWidth() * $this->getHeight());
+		}
 		foreach($this->input as $row){
 			foreach($row as $ingredient){
 				$out->putRecipeIngredient($ingredient);
@@ -166,8 +182,12 @@ final class ShapedRecipe extends RecipeWithTypeId{
 		if($out->getProtocolId() >= ProtocolInfo::PROTOCOL_1_20_80){
 			$out->putBool($this->symmetric);
 
-			if($out->getProtocolId() >= ProtocolInfo::PROTOCOL_1_21_0){
-				$this->unlockingRequirement->write($out);
+			if($out->getProtocolId() >= ProtocolInfo::PROTOCOL_1_26_40){
+				$out->putBool($this->unlockingRequirement !== null);
+				$this->unlockingRequirement?->write($out);
+			}elseif($out->getProtocolId() >= ProtocolInfo::PROTOCOL_1_21_0){
+				//older protocols can't express "no requirement"
+				($this->unlockingRequirement ?? new RecipeUnlockingRequirement(null))->write($out);
 			}
 		}
 

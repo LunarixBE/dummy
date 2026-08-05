@@ -134,6 +134,11 @@ class NetworkInventoryAction{
 	 * @throws PacketDecodeException
 	 */
 	public function readAuthInput(PacketSerializer $packet) : NetworkInventoryAction{
+		if($packet->getProtocolId() >= ProtocolInfo::PROTOCOL_1_26_40){
+			//1.26.40 uses the same layout for both variants
+			return $this->read($packet);
+		}
+
 		$this->sourceType = $packet->getUnsignedVarInt();
 
 		switch($this->sourceType){
@@ -164,6 +169,11 @@ class NetworkInventoryAction{
 	 * @throws \InvalidArgumentException
 	 */
 	public function writeAuthInput(PacketSerializer $packet) : void{
+		if($packet->getProtocolId() >= ProtocolInfo::PROTOCOL_1_26_40){
+			$this->write($packet);
+			return;
+		}
+
 		$packet->putUnsignedVarInt($this->sourceType);
 
 		switch($this->sourceType){

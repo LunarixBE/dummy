@@ -29,6 +29,9 @@ final class PersonaPieceTintColor{
 	public const PIECE_TYPE_PERSONA_HAIR = "persona_hair";
 	public const PIECE_TYPE_PERSONA_MOUTH = "persona_mouth";
 
+	/** >= PROTOCOL_1_26_40 sends a fixed-size array of packed colours instead of a length-prefixed list */
+	public const COLOR_COUNT = 4;
+
 	/**
 	 * @param string[] $colors
 	 */

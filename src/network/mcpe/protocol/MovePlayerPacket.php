@@ -100,7 +100,10 @@ class MovePlayerPacket extends DataPacket implements ClientboundPacket, Serverbo
 		$this->mode = $in->getByte();
 		$this->onGround = $in->getBool();
 		$this->ridingActorRuntimeId = $in->getActorRuntimeId();
-		if($this->mode === MovePlayerPacket::MODE_TELEPORT){
+		$hasTeleportData = $in->getProtocolId() >= ProtocolInfo::PROTOCOL_1_26_40
+			? $in->getBool()
+			: $this->mode === MovePlayerPacket::MODE_TELEPORT;
+		if($hasTeleportData){
 			$this->teleportCause = $in->getLInt();
 			$this->teleportItem = $in->getLInt();
 		}
@@ -116,7 +119,11 @@ class MovePlayerPacket extends DataPacket implements ClientboundPacket, Serverbo
 		$out->putByte($this->mode);
 		$out->putBool($this->onGround);
 		$out->putActorRuntimeId($this->ridingActorRuntimeId);
-		if($this->mode === MovePlayerPacket::MODE_TELEPORT){
+		$hasTeleportData = $this->mode === MovePlayerPacket::MODE_TELEPORT;
+		if($out->getProtocolId() >= ProtocolInfo::PROTOCOL_1_26_40){
+			$out->putBool($hasTeleportData);
+		}
+		if($hasTeleportData){
 			$out->putLInt($this->teleportCause);
 			$out->putLInt($this->teleportItem);
 		}

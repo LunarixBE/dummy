@@ -48,7 +48,48 @@ class SetScorePacket extends DataPacket implements ClientboundPacket{
 		return $result;
 	}
 
+	/** >= PROTOCOL_1_26_40 action ids, sent alongside the numeric entry type */
+	private const ACTION_IDS_1_26_40 = [
+		ScorePacketEntry::TYPE_REMOVE => "remove",
+		ScorePacketEntry::TYPE_PLAYER => "changeplayer",
+		ScorePacketEntry::TYPE_ENTITY => "changeentity",
+		ScorePacketEntry::TYPE_FAKE_PLAYER => "changefakeplayer",
+	];
+
 	protected function decodePayload(PacketSerializer $in) : void{
+		if($in->getProtocolId() >= ProtocolInfo::PROTOCOL_1_26_40){
+			$this->type = self::TYPE_CHANGE;
+			for($i = 0, $i2 = $in->getUnsignedVarInt(); $i < $i2; ++$i){
+				$entry = new ScorePacketEntry();
+				$entry->type = $in->getUnsignedVarInt();
+				$in->getString(); //action id
+				switch($entry->type){
+					case ScorePacketEntry::TYPE_REMOVE:
+						$this->type = self::TYPE_REMOVE;
+						$entry->scoreboardId = $in->getVarLong();
+						$entry->objectiveName = $in->readOptional(fn() => $in->getString()) ?? "";
+						break;
+					case ScorePacketEntry::TYPE_PLAYER:
+					case ScorePacketEntry::TYPE_ENTITY:
+						$entry->scoreboardId = $in->getVarLong();
+						$entry->objectiveName = $in->getString();
+						$entry->score = $in->getLInt();
+						$entry->actorUniqueId = $in->getActorUniqueId();
+						break;
+					case ScorePacketEntry::TYPE_FAKE_PLAYER:
+						$entry->scoreboardId = $in->getVarLong();
+						$entry->objectiveName = $in->getString();
+						$entry->score = $in->getLInt();
+						$entry->customName = $in->getString();
+						break;
+					default:
+						throw new PacketDecodeException("Unknown entry type $entry->type");
+				}
+				$this->entries[] = $entry;
+			}
+			return;
+		}
+
 		$this->type = $in->getByte();
 		for($i = 0, $i2 = $in->getUnsignedVarInt(); $i < $i2; ++$i){
 			$entry = new ScorePacketEntry();
@@ -74,6 +115,33 @@ class SetScorePacket extends DataPacket implements ClientboundPacket{
 	}
 
 	protected function encodePayload(PacketSerializer $out) : void{
+		if($out->getProtocolId() >= ProtocolInfo::PROTOCOL_1_26_40){
+			$out->putUnsignedVarInt(count($this->entries));
+			foreach($this->entries as $entry){
+				$entryType = $this->type === self::TYPE_REMOVE ? ScorePacketEntry::TYPE_REMOVE : $entry->type;
+				$out->putUnsignedVarInt($entryType);
+				$out->putString(self::ACTION_IDS_1_26_40[$entryType] ?? throw new \InvalidArgumentException("Unknown entry type $entryType"));
+				$out->putVarLong($entry->scoreboardId);
+				switch($entryType){
+					case ScorePacketEntry::TYPE_REMOVE:
+						$out->writeOptional($entry->objectiveName, fn(string $v) => $out->putString($v));
+						break;
+					case ScorePacketEntry::TYPE_PLAYER:
+					case ScorePacketEntry::TYPE_ENTITY:
+						$out->putString($entry->objectiveName);
+						$out->putLInt($entry->score);
+						$out->putActorUniqueId($entry->actorUniqueId);
+						break;
+					case ScorePacketEntry::TYPE_FAKE_PLAYER:
+						$out->putString($entry->objectiveName);
+						$out->putLInt($entry->score);
+						$out->putString($entry->customName);
+						break;
+				}
+			}
+			return;
+		}
+
 		$out->putByte($this->type);
 		$out->putUnsignedVarInt(count($this->entries));
 		foreach($this->entries as $entry){

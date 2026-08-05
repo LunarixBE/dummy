@@ -88,6 +88,8 @@ final class ClientDataToSkinDataHelper{
 			$clientData->CapeOnClassicSkin,
 			true, //assume this is true? there's no field for it ...
 			$clientData->OverrideSkin ?? true,
+			SkinData::TRUSTED_SKIN_FLAG_UNSET, //not sent in the login data
+			$clientData->ProfileHash,
 		);
 	}
 }

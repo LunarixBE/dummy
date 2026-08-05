@@ -26,6 +26,7 @@ namespace pocketmine\network\mcpe\protocol;
 use pocketmine\network\mcpe\protocol\serializer\PacketSerializer;
 use pocketmine\network\mcpe\protocol\types\EntityDiagnosticTimingInfo;
 use pocketmine\network\mcpe\protocol\types\MemoryCategoryCounter;
+use pocketmine\network\mcpe\protocol\types\SystemCategory;
 use pocketmine\network\mcpe\protocol\types\SystemDiagnosticTimingInfo;
 use pocketmine\network\mcpe\protocol\types\WhiskerScopeDataSummary;
 use function count;
@@ -62,6 +63,13 @@ class ServerboundDiagnosticsPacket extends DataPacket implements ServerboundPack
 	 * @phpstan-var list<WhiskerScopeDataSummary>
 	 */
 	private array $whiskerScopes = [];
+	/**
+	 * >= PROTOCOL_1_26_40
+	 *
+	 * @var SystemCategory[]
+	 * @phpstan-var list<SystemCategory>
+	 */
+	private array $systemCategories = [];
 
 	/**
 	 * @generate-create-func
@@ -164,6 +172,13 @@ class ServerboundDiagnosticsPacket extends DataPacket implements ServerboundPack
 					$this->systemDiagnostics[] = SystemDiagnosticTimingInfo::read($in);
 				}
 
+				if($in->getProtocolId() >= ProtocolInfo::PROTOCOL_1_26_40){
+					$this->systemCategories = [];
+					for($i = 0, $count = $in->getUnsignedVarInt(); $i < $count; ++$i){
+						$this->systemCategories[] = SystemCategory::read($in);
+					}
+				}
+
 				if($in->getProtocolId() >= ProtocolInfo::PROTOCOL_1_26_30){
 					$this->whiskerScopes = [];
 					for($i = 0, $count = $in->getUnsignedVarInt(); $i < $count; ++$i){
@@ -198,6 +213,13 @@ class ServerboundDiagnosticsPacket extends DataPacket implements ServerboundPack
 				$out->putUnsignedVarInt(count($this->systemDiagnostics));
 				foreach($this->systemDiagnostics as $value){
 					$value->write($out);
+				}
+
+				if($out->getProtocolId() >= ProtocolInfo::PROTOCOL_1_26_40){
+					$out->putUnsignedVarInt(count($this->systemCategories));
+					foreach($this->systemCategories as $value){
+						$value->write($out);
+					}
 				}
 
 				if($out->getProtocolId() >= ProtocolInfo::PROTOCOL_1_26_30){

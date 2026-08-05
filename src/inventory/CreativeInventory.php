@@ -25,16 +25,23 @@ namespace pocketmine\inventory;
 
 use pocketmine\crafting\CraftingManagerFromDataHelper;
 use pocketmine\data\bedrock\BedrockDataFiles;
-use pocketmine\inventory\json\CreativeGroupData;
+use pocketmine\data\SavedDataLoadingException;
+use pocketmine\errorhandler\ErrorToExceptionHandler;
 use pocketmine\item\Item;
 use pocketmine\lang\Translatable;
+use pocketmine\nbt\LittleEndianNbtSerializer;
 use pocketmine\utils\DestructorCallbackTrait;
+use pocketmine\utils\Filesystem;
 use pocketmine\utils\ObjectSet;
 use pocketmine\utils\SingletonTrait;
-use Symfony\Component\Filesystem\Path;
-use function array_filter;
+use pocketmine\utils\Utils;
 use function array_map;
+use function base64_decode;
 use function in_array;
+use function is_array;
+use function is_int;
+use function is_string;
+use function json_decode;
 
 final class CreativeInventory{
 	use SingletonTrait;
@@ -52,43 +59,107 @@ final class CreativeInventory{
 	private function __construct(){
 		$this->contentChangedCallbacks = new ObjectSet();
 
-		foreach([
-			"construction" => CreativeCategory::CONSTRUCTION,
-			"nature" => CreativeCategory::NATURE,
-			"equipment" => CreativeCategory::EQUIPMENT,
-			"items" => CreativeCategory::ITEMS,
-		] as $categoryId => $categoryEnum){
-			$groups = CraftingManagerFromDataHelper::loadJsonArrayOfObjectsFile(
-				Path::join(BedrockDataFiles::CREATIVE, $categoryId . ".json"),
-				CreativeGroupData::class
-			);
-
-			foreach($groups as $groupData){
-				//edu edition groups (chemistry table, compounds, elements and products such as
-				//medicine/balloons/glow sticks/sparklers) have no valid creative category on non-edu
-				if(in_array($groupData->group_name, [
-					"itemGroup.name.chemistrytable",
-					"itemGroup.name.compounds",
-					"itemGroup.name.elements",
-					"itemGroup.name.products",
-				], true)){
-					continue;
-				}
-
-				$icon = $groupData->group_icon === null ? null : CraftingManagerFromDataHelper::deserializeItemStack($groupData->group_icon);
-
-				$group = $icon === null ? null : new CreativeGroup(
-					new Translatable($groupData->group_name),
-					$icon
-				);
-
-				$items = array_filter(array_map(static fn($itemStack) => CraftingManagerFromDataHelper::deserializeItemStack($itemStack), $groupData->items));
-
-				foreach($items as $item){
-					$this->add($item, $categoryEnum, $group);
-				}
-			}
+		$data = json_decode(Filesystem::fileGetContents(BedrockDataFiles::CREATIVE_ITEMS_JSON), true);
+		if(!is_array($data) || !isset($data["groups"], $data["items"]) || !is_array($data["groups"]) || !is_array($data["items"])){
+			throw new SavedDataLoadingException(BedrockDataFiles::CREATIVE_ITEMS_JSON . " should contain groups and items lists");
 		}
+
+		$categories = [];
+		$groups = [];
+		$skippedGroups = [];
+		foreach(Utils::promoteKeys($data["groups"]) as $index => $groupData){
+			if(
+				!is_array($groupData) ||
+				!isset($groupData["creative_category"], $groupData["name"], $groupData["icon"]) ||
+				!is_int($groupData["creative_category"]) || !is_string($groupData["name"]) || !is_array($groupData["icon"])
+			){
+				throw new SavedDataLoadingException("Invalid creative group at index $index");
+			}
+
+			//edu edition groups (chemistry table, compounds, elements and products such as
+			//medicine/balloons/glow sticks/sparklers) have no valid creative category on non-edu
+			if(in_array($groupData["name"], [
+				"itemGroup.name.chemistrytable",
+				"itemGroup.name.compounds",
+				"itemGroup.name.elements",
+				"itemGroup.name.products",
+			], true)){
+				$skippedGroups[$index] = true;
+				continue;
+			}
+
+			$categories[$index] = match($groupData["creative_category"]){
+				1 => CreativeCategory::CONSTRUCTION,
+				2 => CreativeCategory::NATURE,
+				3 => CreativeCategory::EQUIPMENT,
+				default => CreativeCategory::ITEMS
+			};
+
+			$icon = $groupData["name"] === "" ? null : self::deserializeItem($groupData["icon"]);
+			$groups[$index] = $icon === null ? null : new CreativeGroup(
+				new Translatable($groupData["name"]),
+				$icon
+			);
+		}
+
+		foreach(Utils::promoteKeys($data["items"]) as $index => $itemData){
+			if(!is_array($itemData) || !isset($itemData["group_index"]) || !is_int($itemData["group_index"])){
+				throw new SavedDataLoadingException("Invalid creative item at index $index");
+			}
+			$groupIndex = $itemData["group_index"];
+			if(isset($skippedGroups[$groupIndex])){
+				continue;
+			}
+			$item = self::deserializeItem($itemData);
+			if($item === null){ //unknown item
+				continue;
+			}
+			$this->add($item, $categories[$groupIndex] ?? CreativeCategory::ITEMS, $groups[$groupIndex] ?? null);
+		}
+	}
+
+	/**
+	 * @param mixed[] $data
+	 */
+	private static function deserializeItem(array $data) : ?Item{
+		if(!isset($data["id"]) || !is_string($data["id"])){
+			throw new SavedDataLoadingException("Creative item should have a string id");
+		}
+
+		$blockStatesTag = null;
+		if(isset($data["block_state_b64"])){
+			if(!is_string($data["block_state_b64"])){
+				throw new SavedDataLoadingException("block_state_b64 should be a string");
+			}
+			//full palette entry - only the states matter here
+			$blockStatesTag = (new LittleEndianNbtSerializer())
+				->read(ErrorToExceptionHandler::trapAndRemoveFalse(fn() => base64_decode($data["block_state_b64"], true)))
+				->mustGetCompoundTag()
+				->getCompoundTag("states");
+		}
+
+		$nbt = null;
+		if(isset($data["nbt_b64"])){
+			if(!is_string($data["nbt_b64"])){
+				throw new SavedDataLoadingException("nbt_b64 should be a string");
+			}
+			$nbt = (new LittleEndianNbtSerializer())
+				->read(ErrorToExceptionHandler::trapAndRemoveFalse(fn() => base64_decode($data["nbt_b64"], true)))
+				->mustGetCompoundTag();
+		}
+
+		$damage = $data["damage"] ?? null;
+		if($damage !== null && !is_int($damage)){
+			throw new SavedDataLoadingException("damage should be an int");
+		}
+
+		return CraftingManagerFromDataHelper::deserializeItemStackFromFields(
+			$data["id"],
+			$damage,
+			1,
+			$blockStatesTag,
+			$nbt
+		);
 	}
 
 	/**

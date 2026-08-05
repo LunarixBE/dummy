@@ -125,4 +125,12 @@ final class ParticleIds{
 	public const PALE_OAK_LEAVES = 95;
 	public const EYEBLOSSOM_OPEN = 96;
 	public const EYEBLOSSOM_CLOSE = 97;
+	public const GREEN_FLAME = 98;
+	public const PAUSE_MOB_GROWTH = 99;
+	public const RESET_MOB_GROWTH = 100;
+	/** >= PROTOCOL_1_26_40 */
+	public const SULFUR_CUBE = 101;
+	public const ORANGE_POPLAR_LEAVES = 102;
+	public const RED_POPLAR_LEAVES = 103;
+	public const YELLOW_POPLAR_LEAVES = 104;
 }
